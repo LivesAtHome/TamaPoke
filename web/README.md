@@ -11,7 +11,9 @@ same one as `tools/send_sd.py`).
 - `index.html` — the page (flashing + sprite loader).
 - `manifest.json` — ESP Web Tools config. **This fork flashes four separate parts** (bootloader `0x0`,
   partitions `0x8000`, `boot_app0` `0xe000`, app `0x10000`) so the NVS save at `0x9000`–`0xdfff`
-  is never written: updates keep the pet and the Wi-Fi settings. Erase is never offered.
+  is never written. `new_install_prompt_erase` must stay **true**: ESP Web Tools erases the whole
+  chip by default on boards without Improv Serial when it is false. With it true, the user is asked
+  and the box starts unticked, so updates keep the pet and the Wi-Fi settings.
 - `firmware/` — those four parts, from an `arduino-cli compile --output-dir` build
   (`boot_app0.bin` comes from the ESP32 core's `tools/partitions/`).
 - `sprites.pak` — all the sprites in one bundle (TPAK), so the page sends them in

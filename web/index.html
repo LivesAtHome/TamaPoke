@@ -60,9 +60,11 @@
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
       <span slot="not-allowed">Needs HTTPS.</span>
     </esp-web-install-button>
-    <p class="note">🛡️ <b>Updating is safe:</b> this installer never erases the board and never
-       writes over the area where your Pokémon and Wi-Fi settings are saved, so they carry over.
-       (The original TamaPoke installer writes one big image that does overwrite it.)</p>
+    <p class="note">🛡️ <b>To keep your Pokémon and Wi-Fi settings, leave "Erase device" unticked</b>
+       when it asks (it starts unticked). The firmware itself never writes over the area where
+       they're saved. Only tick it for a brand-new board or a clean start.</p>
+    <p class="note">⚠️ If the next screen says <b>"All data on the device will be erased"</b>, go back:
+       that means the erase box was ticked.</p>
     <p class="note">Board not showing up? Use a USB-C cable that carries data, plugged straight into
        the computer. A brand-new board may need download mode: hold <b>BOOT</b>, tap <b>RESET</b>,
        let go of BOOT, then try again.</p>

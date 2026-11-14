@@ -1,7 +1,7 @@
 {
   "name": "TamaPoke + Weather",
   "version": "1.20-wx2",
-  "new_install_prompt_erase": false,
+  "new_install_prompt_erase": true,
   "builds": [
     {
       "chipFamily": "ESP32-S3",
