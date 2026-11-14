@@ -5,14 +5,14 @@
 
 enum Holiday : uint8_t {
   HOL_NONE = 0,
-  HOL_NEWYEAR,      // Dec 31 - Jan 1   fireworks at night, confetti by day
-  HOL_VALENTINE,    // Feb 13 - 14      hearts drifting up
-  HOL_STPATRICK,    // Mar 17           shamrocks in the grass
-  HOL_EASTER,       // Sat - Sun        painted eggs on the ground
-  HOL_JULY4,        // Jul 3 - 4        bunting, fireworks at night
-  HOL_HALLOWEEN,    // Oct 25 - 31      jack-o'-lanterns, bats at night
-  HOL_THANKSGIVING, // Thu - Sun        autumn leaves falling
-  HOL_CHRISTMAS,    // Dec 20 - 26      string lights, a little tree
+  HOL_NEWYEAR,      // Dec 27 - Jan 1   fireworks at night, confetti by day
+  HOL_VALENTINE,    // Feb 7 - 14       hearts drifting up
+  HOL_STPATRICK,    // Mar 10 - 17      shamrocks in the grass
+  HOL_EASTER,       // the week to Easter Sunday: painted eggs on the ground
+  HOL_JULY4,        // Jun 27 - Jul 4   bunting, fireworks at night
+  HOL_HALLOWEEN,    // Oct 24 - 31      jack-o'-lanterns, bats at night
+  HOL_THANKSGIVING, // week before Thu - Sun: autumn leaves falling
+  HOL_CHRISTMAS,    // Dec 18 - 26      string lights, a little tree
   HOL_COUNT
 };
 
@@ -54,28 +54,46 @@ static inline int holThanksgivingDay(int y) {
   return firstThu + 21;
 }
 
-// which holiday the date is in; *mainDay = true on the holiday itself
+// days since 1970-01-01 for a civil date (inverse of holCivil)
+static inline int32_t holDays(int y, int m, int d) {
+  y -= m <= 2;
+  int32_t era = (y >= 0 ? y : y - 399) / 400;
+  uint32_t yoe = (uint32_t)(y - era * 400);
+  uint32_t doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+  uint32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + (int32_t)doe - 719468;
+}
+
+#define HOL_LEAD_DAYS 7   // decorations go up a week before the day itself
+
+// which holiday the date is in; *mainDay = true on the holiday itself.
+// Each one shows from a week before its day until its last day; the order
+// below settles the two overlaps (St. Patrick's before an early Easter, and
+// Christmas ends on the 26th so New Year's starts on the 27th).
 static inline uint8_t holidayFor(int y, int m, int d, bool *mainDay) {
-  bool md = false;
-  uint8_t h = HOL_NONE;
-  if ((m == 12 && d == 31) || (m == 1 && d == 1)) { h = HOL_NEWYEAR; md = (m == 1); }
-  else if (m == 2 && (d == 13 || d == 14)) { h = HOL_VALENTINE; md = d == 14; }
-  else if (m == 3 && d == 17) { h = HOL_STPATRICK; md = true; }
-  else if (m == 7 && (d == 3 || d == 4)) { h = HOL_JULY4; md = d == 4; }
-  else if (m == 10 && d >= 25) { h = HOL_HALLOWEEN; md = d == 31; }
-  else if (m == 11) {
-    int t = holThanksgivingDay(y);
-    if (d >= t && d <= t + 3) { h = HOL_THANKSGIVING; md = d == t; }
-  } else if (m == 12 && d >= 20 && d <= 26) { h = HOL_CHRISTMAS; md = d == 25; }
-  if (h == HOL_NONE && (m == 3 || m == 4)) {      // Easter moves: Saturday + Sunday
-    int em, ed;
-    holEaster(y, em, ed);
-    int sm = em, sd = ed - 1;                      // the Saturday before
-    if (sd == 0) { sm = 3; sd = 31; }
-    if ((m == em && d == ed) || (m == sm && d == sd)) { h = HOL_EASTER; md = (d == ed && m == em); }
-  }
-  if (mainDay) *mainDay = md;
-  return h;
+  struct Win { uint8_t h; int32_t day, from, to; };
+  int32_t t = holDays(y, m, d);
+  int em, ed;
+  holEaster(y, em, ed);
+  int32_t easter = holDays(y, em, ed), thanks = holDays(y, 11, holThanksgivingDay(y));
+  int32_t xmas = holDays(y, 12, 25), ny = holDays(m == 12 ? y + 1 : y, 1, 1);
+  const Win w[] = {
+    { HOL_NEWYEAR, ny, holDays(m == 12 ? y : y - 1, 12, 27), ny },
+    { HOL_VALENTINE, holDays(y, 2, 14), holDays(y, 2, 14) - HOL_LEAD_DAYS, holDays(y, 2, 14) },
+    { HOL_STPATRICK, holDays(y, 3, 17), holDays(y, 3, 17) - HOL_LEAD_DAYS, holDays(y, 3, 17) },
+    { HOL_EASTER, easter, easter - HOL_LEAD_DAYS, easter },
+    { HOL_JULY4, holDays(y, 7, 4), holDays(y, 7, 4) - HOL_LEAD_DAYS, holDays(y, 7, 4) },
+    { HOL_HALLOWEEN, holDays(y, 10, 31), holDays(y, 10, 31) - HOL_LEAD_DAYS, holDays(y, 10, 31) },
+    { HOL_THANKSGIVING, thanks, thanks - HOL_LEAD_DAYS, thanks + 3 },
+    { HOL_CHRISTMAS, xmas, xmas - HOL_LEAD_DAYS, xmas + 1 },
+  };
+  for (const Win &x : w)
+    if (t >= x.from && t <= x.to) {
+      if (mainDay) *mainDay = (t == x.day);
+      return x.h;
+    }
+  if (mainDay) *mainDay = false;
+  return HOL_NONE;
 }
 
 // from a LOCAL epoch (the RTC keeps local time, as the rest of the game assumes)
