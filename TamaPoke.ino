@@ -34,6 +34,8 @@
 #include "wifisync.h"  // weather add-on: Wi-Fi clock + Open-Meteo (ported from botero50/TamaPoke)
 #include "weather.h"
 #include "wxmood.h"
+#include "holiday.h"   // holiday add-on (date logic; the drawing comes in further down)
+static uint8_t holidayOverride = 0;   // serial HOLIDAY <n>: preview one until the next restart (0 = real date)
 #include "i18n.h"
 #include "audio.h"
 #include "blit.h"
@@ -798,6 +800,11 @@ void handleSerial() {
     int sp = rest.indexOf(' ');
     if (sp < 0) Serial.println("ERR");
     else { wifiSetPlace((float)atof(rest.substring(0, sp).c_str()), (float)atof(rest.substring(sp + 1).c_str())); Serial.println("DONE"); }
+  } else if (line.startsWith("HOLIDAY ")) {   // holiday add-on: HOLIDAY <1-8> previews one, HOLIDAY 0 = real date
+    int n = line.substring(8).toInt();
+    holidayOverride = (n > 0 && n < HOL_COUNT) ? (uint8_t)n : 0;
+    Serial.printf("holiday=%u\n", holidayOverride);
+    Serial.println("DONE");
   } else if (line == "WIFISTAT") {
     char d[120];
     wifiDiag(d, sizeof(d));
@@ -1370,6 +1377,14 @@ static void drawSkyWeather(uint32_t now, bool night) {
   }
 }
 
+// ---------- holiday add-on ----------
+#include "holidaydraw.h"
+
+uint8_t currentHoliday(bool *mainDay) {
+  if (holidayOverride) { if (mainDay) *mainDay = true; return holidayOverride; }
+  return holidayForEpoch(pet.lastSeenEpoch, mainDay);
+}
+
 void drawScene(uint8_t biome, uint32_t now, bool night) {
   int h = sceneHour();
   uint16_t top, bot;
@@ -1452,6 +1467,7 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
         gfx->fillRect(gx + b * 5, HORIZON + 6, 2, 8 + (b == 0 ? 4 : 0), dk);
   }
   drawSkyWeather(now, night);  // weather add-on
+  drawHoliday(currentHoliday(nullptr), now, night);  // holiday add-on
 }
 
 // primera partida: elige inicial entre Bulbasaur / Charmander / Squirtle
@@ -3458,6 +3474,11 @@ const char *statusMsg() {
   if (pet.joy < 25) return T(S_SAD);
   if (pet.weight > 60) return T(S_CHUBBY);
   if (pet.shiny && pet.ageMinutes < 15) return T(S_IS_SHINY);
+  {  // holiday add-on: a greeting on the day itself
+    bool mainDay = false;
+    uint8_t h = currentHoliday(&mainDay);
+    if (mainDay && holidayGreeting(h)) return holidayGreeting(h);
+  }
   {  // weather add-on: what it thinks of the weather outside
     const char *wm = nullptr;
     wxMood(pet.speciesId, weatherShown(millis()), weatherLast().temp10, &wm);

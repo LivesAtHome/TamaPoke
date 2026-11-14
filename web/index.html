@@ -124,6 +124,26 @@
     <pre class="log" id="wifilog"></pre>
   </div>
 
+  <h2>🎉 Holiday decorations</h2>
+  <div class="step">
+    <p>They show up by themselves on the real dates: New Year's, Valentine's, St. Patrick's, Easter,
+       the 4th of July, Halloween (the week before), Thanksgiving (through the weekend) and Christmas
+       (Dec 20-26), with a greeting on the day itself.</p>
+    <p class="note">Want a sneak peek? With the board connected (step 2), pick one. The preview lasts
+       until the board restarts.</p>
+    <div class="row">
+      <select id="hpick" style="max-width:220px">
+        <option value="1">New Year's</option><option value="2">Valentine's</option>
+        <option value="3">St. Patrick's</option><option value="4">Easter</option>
+        <option value="5">4th of July</option><option value="6">Halloween</option>
+        <option value="7">Thanksgiving</option><option value="8">Christmas</option>
+        <option value="0">Back to the real date</option>
+      </select>
+      <button id="hshow" disabled>👀 Preview</button>
+    </div>
+    <pre class="log" id="hlog"></pre>
+  </div>
+
   <h2>How to play</h2>
   <p>Care for your egg until it hatches, feed it, play, train it and complete them all. Tap the
      creature to pet it; <b>tap the poop to sweep it</b> (the bath still does the full wash); swipe
@@ -144,7 +164,7 @@
 <script>
 const mkLog = (id) => (m) => { const el = document.getElementById(id); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
-const log = mkLog('log'), wlog = mkLog('wifilog');
+const log = mkLog('log'), wlog = mkLog('wifilog'), hlog = mkLog('hlog');
 const $ = (id) => document.getElementById(id);
 
 const supported = 'serial' in navigator;
@@ -194,7 +214,7 @@ $('connect').onclick = async () => {
     writer = port.writable.getWriter();
     lineBuf = '';
     $('connstate').textContent = '✅ Connected';
-    for (const id of ['auto', 'files', 'wsend', 'wstat', 'wforget']) $(id).disabled = false;
+    for (const id of ['auto', 'files', 'wsend', 'wstat', 'wforget', 'hshow']) $(id).disabled = false;
     $('connect').disabled = true;
   } catch (e) { $('connstate').textContent = 'Could not connect: ' + e.message; }
 };
@@ -363,6 +383,21 @@ $('wstat').onclick = () => talk(async () => {
   else wlog('Waiting for its first sync (about 15 seconds after it starts).');
   wlog('   details: ' + line);
 });
+
+$('hshow').onclick = async () => {
+  if (!writer) { hlog('Connect the board first (step 2).'); return; }
+  if (busy) { hlog('Wait for the other transfer to finish first.'); return; }
+  busy = true;
+  try {
+    await drain();
+    await send('HOLIDAY ' + $('hpick').value);
+    const ok = await waitFor('DONE', 4000);
+    const label = $('hpick').options[$('hpick').selectedIndex].textContent;
+    hlog(!ok ? 'No answer. Update the firmware (step 1) first: older versions do not have holidays.'
+             : $('hpick').value === '0' ? 'Back to the real date.' : `Showing ${label} now. Restart the board to end the preview.`);
+  } catch (e) { hlog('Error: ' + e.message); }
+  busy = false;
+};
 
 $('wforget').onclick = () => talk(async () => {
   await send('WIFIOFF');
