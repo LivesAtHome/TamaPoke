@@ -1,6 +1,6 @@
 # TamaPoke
 
-[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://socquique.github.io/TamaPoke/web/)
+[![Flash in browser](https://img.shields.io/badge/flash-in%20browser-FF6B00?logo=googlechrome&logoColor=white)](https://livesathome.github.io/TamaPoke/web/)
 [![MakerWorld](https://img.shields.io/badge/MakerWorld-3D%20case-00AE42?logo=bambulab&logoColor=white)](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)
 ![Board](https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white)
 ![Firmware](https://img.shields.io/badge/firmware-v1.17-8A2BE2)
@@ -9,12 +9,36 @@
 ![Languages](https://img.shields.io/badge/languages-9-FFCB05)
 [![Stars](https://img.shields.io/github/stars/socquique/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/socquique/TamaPoke/stargazers)
 
-> **About this fork:** this adds live weather, a broom sweep, and weather moods to
-> Quique Tortosa's original TamaPoke. The changes were made with AI assistance
-> (Claude), and parts were ported from [botero50's TamaPoke fork](https://github.com/botero50/TamaPoke).
-> Tested on real hardware, but not reviewed by the original author.
+> **About this fork:** Quique Tortosa's original TamaPoke, plus a few add-ons. The add-ons were
+> made with AI assistance (Claude), and parts were ported from
+> [botero50's TamaPoke fork](https://github.com/botero50/TamaPoke). Tested on real hardware, but
+> not reviewed by the original author.
 >
-> **Installer for this version:** https://livesathome.github.io/TamaPoke/web/ (updates never erase your pet).
+> **Install it from your browser:** https://livesathome.github.io/TamaPoke/web/
+> To keep your Pokémon when updating, leave **"Erase device" unticked** when the installer asks.
+
+## What this fork adds
+
+- 🌦️ **Live weather.** Every 30 minutes the board briefly joins your Wi-Fi (2.4 GHz), sets its clock
+  from the internet and fetches the weather from [Open-Meteo](https://open-meteo.com), then turns the
+  radio off. Grey skies, rain with puddles, snow that builds up on the ground, fog and storms are
+  drawn into the sky, and the outside temperature (°F) shows at the top.
+- 🧹 **Broom.** Tap a pile of poop to sweep it away with a little animation (a bit of hygiene back).
+  The bath still does the full wash.
+- 💧🔥 **Weather moods.** Your Pokémon reacts to the real weather by type: water and grass types love
+  rain, fire types love hot clear days and dislike rain, ice types love snow, electric types love
+  storms, rock and ground types don't like getting wet. A loved weather slows its JOY drain; a
+  disliked one only changes the message, so the weather can never cause a slip-up.
+- 🎉 **Holidays.** Decorations go up a week before New Year's, Valentine's, St. Patrick's, Easter,
+  the 4th of July, Halloween, Thanksgiving and Christmas, with a greeting on the day itself.
+- 🛠️ **Installer page for this version** with Wi-Fi setup by ZIP code or town, a "did it work?"
+  check, and a holiday preview. It flashes the firmware in separate pieces so it never writes over
+  the saved pet.
+
+Serial commands added: `WIFI`, `WIFIOFF`, `WIFISYNC`, `WIFISCAN`, `WIFISTAT`, `TZ`, `GEO`, `NYSNOW`,
+`HOLIDAY <0-8>`.
+
+---
 
 A gen-1-Pokémon-inspired tamagotchi for the
 **Waveshare ESP32-S3-Touch-AMOLED-1.75** (round 466×466 AMOLED, CO5300 driver
@@ -25,7 +49,7 @@ and complete them all (shinies included).
 > PMD SpriteCollab (CC BY-NC, Pokémon © Nintendo/Game Freak), and the 3D case is
 > CC BY-NC-SA. See **[License](#license)** and **Credits**.
 
-🔴 **3D-printed Pokéball case + print profiles → [on MakerWorld](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)** · flash it in your browser → **[web installer](https://socquique.github.io/TamaPoke/web/)**
+🔴 **3D-printed Pokéball case + print profiles → [on MakerWorld](https://makerworld.com/es/models/2937822-tamapoke-a-pokemon-pokeball-tamagotchi)** · flash it in your browser → **[web installer](https://livesathome.github.io/TamaPoke/web/)**
 
 ## Status
 
