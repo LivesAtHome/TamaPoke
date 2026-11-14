@@ -16,7 +16,7 @@ enum : uint8_t { WXA_NONE = 0, WXA_WATER, WXA_FIRE, WXA_GRASS, WXA_ICE, WXA_ELEC
 #define WXM_TOO_HOT_C10 322 // 90 F: too hot for ice types
 
 static inline uint8_t wxAffinity(int16_t dex) {
-  return (dex >= 1 && dex <= 151) ? WX_AFFINITY[dex] : WXA_NONE;
+  return (dex >= 1 && dex <= 151) ? WX_AFFINITY[dex] : (uint8_t)WXA_NONE;
 }
 
 static inline bool wxWet(uint8_t wx) { return wx == WX_RAIN || wx == WX_STORM; }
