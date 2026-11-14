@@ -13,6 +13,8 @@
 > Quique Tortosa's original TamaPoke. The changes were made with AI assistance
 > (Claude), and parts were ported from [botero50's TamaPoke fork](https://github.com/botero50/TamaPoke).
 > Tested on real hardware, but not reviewed by the original author.
+>
+> **Installer for this version:** https://livesathome.github.io/TamaPoke/web/ (updates never erase your pet).
 
 A gen-1-Pokémon-inspired tamagotchi for the
 **Waveshare ESP32-S3-Touch-AMOLED-1.75** (round 466×466 AMOLED, CO5300 driver

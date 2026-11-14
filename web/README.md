@@ -9,8 +9,11 @@ same one as `tools/send_sd.py`).
 ## Contents
 
 - `index.html` — the page (flashing + sprite loader).
-- `manifest.json` — ESP Web Tools config (points at the firmware).
-- `firmware/tamapoke.bin` — combined firmware, flashable at `0x0`.
+- `manifest.json` — ESP Web Tools config. **This fork flashes four separate parts** (bootloader `0x0`,
+  partitions `0x8000`, `boot_app0` `0xe000`, app `0x10000`) so the NVS save at `0x9000`–`0xdfff`
+  is never written: updates keep the pet and the Wi-Fi settings. Erase is never offered.
+- `firmware/` — those four parts, from an `arduino-cli compile --output-dir` build
+  (`boot_app0.bin` comes from the ESP32 core's `tools/partitions/`).
 - `sprites.pak` — all the sprites in one bundle (TPAK), so the page sends them in
   one click. **Generated** by `tools/pack_bundle.py` (gitignored by default — see
   *Hosting the sprites* below).

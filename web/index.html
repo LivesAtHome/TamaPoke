@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TamaPoke · Installer</title>
+<title>TamaPoke + Weather · Installer</title>
 <style>
   :root { --bg:#f2efe1; --ink:#2a2a36; --accent:#4f93c4; --ok:#58b868; --bad:#e8503a; --track:#d8d2bd; }
   * { box-sizing: border-box; }
@@ -12,7 +12,7 @@
   .wrap { max-width: 680px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
   h1 { font-size: 2rem; margin: 0 0 .25rem; }
   h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; }
-  .sub { color:#6b6b76; margin: 0 0 1.5rem; }
+  .sub { color:#6b6b76; margin: 0 0 1rem; }
   .step { background:#fff; border:1px solid var(--track); border-radius:14px; padding:1.25rem 1.5rem; margin: 1rem 0; }
   .num { display:inline-flex; width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff;
          align-items:center; justify-content:center; font-weight:600; margin-right:.5rem; font-size:.9rem; }
@@ -20,100 +20,154 @@
            background:#fff; cursor:pointer; }
   button:hover { background:var(--bg); }
   button:disabled { opacity:.5; cursor:default; }
+  input[type=text], input[type=password], select { font: inherit; padding:.5rem .7rem; border-radius:8px;
+           border:1px solid var(--track); width:100%; max-width:320px; background:#fff; color:var(--ink); }
+  label.f { display:block; font-weight:500; margin:.75rem 0 .25rem; }
   esp-web-install-button { display:inline-block; }
   esp-web-install-button[install-unsupported] { display:none; }
   .unsupported { display:none; color:var(--bad); font-weight:500; }
   .row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
-  #log { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
+  pre.log { font-family: ui-monospace, monospace; font-size:.85rem; background:#1b1b25; color:#d8dcf0;
          border-radius:10px; padding:.75rem 1rem; margin-top:1rem; max-height:220px; overflow:auto; white-space:pre-wrap; display:none; }
   .bar { height:10px; background:var(--track); border-radius:5px; overflow:hidden; margin-top:.75rem; display:none; }
   .bar > div { height:100%; width:0; background:var(--ok); transition: width .15s; }
   code { background:#0001; padding:.1em .4em; border-radius:5px; }
   a { color:var(--accent); }
   .note { font-size:.9rem; color:#6b6b76; }
+  .ai { background:#fff8e0; border:1px solid #ecd78a; border-radius:12px; padding:.75rem 1rem; font-size:.92rem; }
+  .status { font-weight:600; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🐢 TamaPoke</h1>
-  <p class="sub">A 151-Pokémon tamagotchi for the Waveshare ESP32-S3-Touch-AMOLED-1.75.
-     Install it from your browser — no Arduino, no drivers.</p>
+  <h1>🐢 TamaPoke + Weather</h1>
+  <p class="sub">The original TamaPoke for the Waveshare ESP32-S3-Touch-AMOLED-1.75, plus live
+     weather in the sky, a broom to sweep the poop, and Pokémon that react to the weather by type.</p>
+  <p class="ai">🤖 <b>Made with AI assistance.</b> These add-ons were written with Claude, and parts
+     were ported from <a href="https://github.com/botero50/TamaPoke" target="_blank">botero50's fork</a>.
+     The game itself is <a href="https://github.com/socquique/TamaPoke" target="_blank">Quique Tortosa's TamaPoke</a>.
+     Tested on real hardware, but not reviewed by the original author.</p>
 
   <p class="unsupported" id="unsupported">
     ⚠️ Your browser doesn't support Web Serial. Use <b>Chrome</b> or <b>Edge</b> on a computer.
   </p>
 
-  <h2><span class="num">1</span>Flash the firmware</h2>
+  <h2><span class="num">1</span>Install or update the firmware</h2>
   <div class="step">
-    <p>Plug the board in via USB and press install. Pick the port and wait.</p>
+    <p>Plug the board in via USB, press the button and pick the port. It takes about a minute.</p>
     <esp-web-install-button manifest="manifest.json">
-      <button slot="activate">⚡ Install TamaPoke</button>
+      <button slot="activate">⚡ Install / update</button>
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
       <span slot="not-allowed">Needs HTTPS.</span>
     </esp-web-install-button>
-    <p class="note">🔄 <b>Updating to a new version? Install <u>without</u> erasing</b> to keep
-       your Pokémon — the save lives in flash and the sprites on the microSD, so a normal
-       install keeps both. Only a full <b>Erase</b> wipes your saved pet (the SD sprites
-       survive even that). First time on a fresh board? You can erase, no problem.</p>
+    <p class="note">🛡️ <b>Updating is safe:</b> this installer never erases the board and never
+       writes over the area where your Pokémon and Wi-Fi settings are saved, so they carry over.
+       (The original TamaPoke installer writes one big image that does overwrite it.)</p>
+    <p class="note">Board not showing up? Use a USB-C cable that carries data, plugged straight into
+       the computer. A brand-new board may need download mode: hold <b>BOOT</b>, tap <b>RESET</b>,
+       let go of BOOT, then try again.</p>
   </div>
 
-  <h2><span class="num">2</span>Load the sprites onto the microSD</h2>
+  <h2><span class="num">2</span>Connect to the board</h2>
   <div class="step">
-    <p>Put a microSD into the board (it formats itself). Press <b>Connect board</b>
-       and then <b>Load sprites</b>: they download and copy over USB automatically
-       (~40 MB, a few minutes). Don't remove the card.</p>
-    <p class="note">Close the step-1 install tab first (only one program can use
-       the port at a time).</p>
+    <p>Needed for the sprites and the Wi-Fi below. Close the install popup and any other
+       installer tab first (only one program can use the board at a time).</p>
     <div class="row">
       <button id="connect">🔌 Connect board</button>
+      <span id="connstate" class="note">Not connected</span>
+    </div>
+  </div>
+
+  <h2><span class="num">3</span>Load the sprites onto the microSD</h2>
+  <div class="step">
+    <p>Only needed once per card. Put a microSD into the board (it formats itself), connect in
+       step 2, then press <b>Load sprites</b> (~40 MB, about 10 minutes). Don't remove the card.</p>
+    <div class="row">
       <button id="auto" disabled>⬇️ Load sprites</button>
     </div>
     <p class="note">Have your own <code>.bin</code> files? <label style="cursor:pointer;text-decoration:underline">pick them manually<input id="files" type="file" accept=".bin" multiple disabled hidden></label></p>
-    <p class="note">🎨 Want to make your own sprites? See <a href="https://github.com/socquique/TamaPoke#generate-and-load-the-sprites-yourself" target="_blank">how to generate &amp; load them</a> in the repo.</p>
+    <p class="note">If it stops partway, press the button again: it picks up where it left off.
+       Restart the board when it's done.</p>
     <div class="bar" id="bar"><div></div></div>
-    <pre id="log"></pre>
+    <pre class="log" id="log"></pre>
+  </div>
+
+  <h2><span class="num">4</span>Wi-Fi for the real time and weather</h2>
+  <div class="step">
+    <p>The board joins your Wi-Fi every 30 minutes for a few seconds to set its clock and fetch
+       the weather from <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>, then
+       switches the radio off. <b>2.4 GHz networks only</b>; a separate IoT/guest network is best.</p>
+
+    <label class="f" for="wssid">Wi-Fi name</label>
+    <input type="text" id="wssid" autocomplete="off" spellcheck="false">
+    <label class="f" for="wpass">Wi-Fi password</label>
+    <input type="password" id="wpass" autocomplete="off">
+
+    <label class="f" for="wplace">Where are you? (ZIP code or town)</label>
+    <div class="row">
+      <input type="text" id="wplace" placeholder="e.g. 10001 or Springfield" style="max-width:220px">
+      <button id="wfind">🔎 Find</button>
+      <button id="wgeo">📍 Use this computer's location</button>
+    </div>
+    <select id="wpick" style="margin-top:.5rem; display:none"></select>
+    <p class="note" id="wplacenote">Only a rough location is sent to the board (rounded to about 1 km).
+       Skip it for clock-only, no weather.</p>
+
+    <div class="row" style="margin-top:1rem">
+      <button id="wsend" disabled>📶 Send to the board</button>
+      <button id="wstat" disabled>🩺 Check if it worked</button>
+      <button id="wforget" disabled>Forget Wi-Fi</button>
+    </div>
+    <p class="note">The password is stored only on the board (this page doesn't keep it or send it
+       anywhere else). Anyone with the board and a USB cable could technically read it back out,
+       which is normal for small gadgets like this.</p>
+    <pre class="log" id="wifilog"></pre>
   </div>
 
   <h2>How to play</h2>
-  <p>Care for your egg until it hatches, feed it, play, train it and complete them
-     all. Tap the creature to pet it; swipe to open the Pokédex (sideways), the
-     stat card (up) or set the clock (down); the physical PWR button turns the
-     screen off (short press) or everything off (long press).
-     More in the <a href="https://github.com/socquique/TamaPoke" target="_blank">repository</a>.</p>
+  <p>Care for your egg until it hatches, feed it, play, train it and complete them all. Tap the
+     creature to pet it; <b>tap the poop to sweep it</b> (the bath still does the full wash); swipe
+     to open the Pokédex (sideways), the stat card (up) or set the clock (down). The PWR button turns
+     the screen off (short press) or everything off (long press). Water types love the rain, fire
+     types love the heat, ice types love snow, electric types love storms.
+     More in the <a href="https://github.com/LivesAtHome/TamaPoke" target="_blank">repository</a>.</p>
 
   <p class="note">Sprites from <a href="https://github.com/PMDCollab/SpriteCollab" target="_blank">PMD SpriteCollab</a> (CC BY-NC).
-     Pokémon is a ™ of Nintendo / Game Freak. Non-commercial project.</p>
+     Pokémon is a ™ of Nintendo / Game Freak. Weather data by <a href="https://open-meteo.com" target="_blank">Open-Meteo.com</a>.
+     Non-commercial fan project.</p>
 </div>
 
-<!-- version exacta (no el rango flotante @10) con Subresource Integrity, para
-     que un fichero del CDN alterado o cambiado sin avisar no se ejecute en
-     silencio. Ojo: el SRI solo cubre este fichero de entrada; los import()
-     dinamicos que el hace de sus propios chunks no quedan cubiertos, y cerrar
-     eso del todo obligaria a hospedar el arbol entero de esp-web-tools.
-     Al subir de version hay que recalcular el hash:
-       curl -s https://unpkg.com/esp-web-tools@X.Y.Z/dist/web/install-button.js \
-         | openssl dgst -sha384 -binary | openssl base64 -A -->
+<!-- pinned version with Subresource Integrity, same as the original installer -->
 <script type="module" crossorigin="anonymous"
         integrity="sha384-9XfyvAabgkISlB/Xb3OpshGKpZx0TOt5Mmu78SeiNU3so/p4o2s9m66vy6Utdnom"
         src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js"></script>
 <script>
-const log = (m) => { const el = document.getElementById('log'); el.style.display='block';
+const mkLog = (id) => (m) => { const el = document.getElementById(id); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
-const supported = 'serial' in navigator;
-if (!supported) { document.getElementById('unsupported').style.display='block';
-  document.getElementById('connect').disabled = true; }
+const log = mkLog('log'), wlog = mkLog('wifilog');
+const $ = (id) => document.getElementById(id);
 
-let port, reader, writer, lineBuf = '';
+const supported = 'serial' in navigator;
+if (!supported) { $('unsupported').style.display = 'block'; $('connect').disabled = true; }
+
+let port, reader, writer, lineBuf = '', pendingRead = null;
+let busy = false;   // one conversation with the board at a time
 
 async function readLine(timeoutMs = 6000) {
   const deadline = Date.now() + timeoutMs;
   while (true) {
     const nl = lineBuf.indexOf('\n');
     if (nl >= 0) { const l = lineBuf.slice(0, nl).trim(); lineBuf = lineBuf.slice(nl + 1); return l; }
-    if (Date.now() > deadline) return null;
-    const { value, done } = await reader.read();
-    if (done) return null;
-    lineBuf += new TextDecoder().decode(value);
+    const left = deadline - Date.now();
+    if (left <= 0) return null;
+    // one read in flight at a time: a read that outlives the deadline is kept and
+    // awaited again next time, so no bytes are ever dropped
+    if (!pendingRead) pendingRead = reader.read();
+    const r = await Promise.race([pendingRead, new Promise((ok) => setTimeout(() => ok(null), left))]);
+    if (r === null) return null;
+    pendingRead = null;
+    if (r.done) return null;
+    lineBuf += new TextDecoder().decode(r.value);
   }
 }
 
@@ -129,8 +183,24 @@ async function waitFor(token, timeoutMs = 6000) {
 }
 
 const enc = new TextEncoder();
+const send = (line) => writer.write(enc.encode(line + '\n'));
+async function drain() { lineBuf = ''; while (await readLine(250) !== null) {} }
 
-// sends one file to the board with the PUT protocol (name includes the mons/ prefix)
+$('connect').onclick = async () => {
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    reader = port.readable.getReader();
+    writer = port.writable.getWriter();
+    lineBuf = '';
+    $('connstate').textContent = '✅ Connected';
+    for (const id of ['auto', 'files', 'wsend', 'wstat', 'wforget']) $(id).disabled = false;
+    $('connect').disabled = true;
+  } catch (e) { $('connstate').textContent = 'Could not connect: ' + e.message; }
+};
+
+// ---------- sprites (unchanged protocol from the original installer) ----------
+
 async function sendOne(name, data) {
   await writer.write(enc.encode(`PUT ${name} ${data.length}\n`));
   if (!await waitFor('OK')) return false;
@@ -141,7 +211,6 @@ async function sendOne(name, data) {
   return await waitFor('DONE', 30000);
 }
 
-// splits the sprites.pak bundle (TPAK) into its individual files
 function parsePak(buf) {
   const dv = new DataView(buf), td = new TextDecoder();
   if (td.decode(new Uint8Array(buf, 0, 4)) !== 'TPAK') throw new Error('invalid bundle');
@@ -158,74 +227,147 @@ function parsePak(buf) {
   return items;
 }
 
-// reanudacion: recuerda que ficheros se confirmaron (nombre+tamano, para que un
-// bundle regenerado con distinto contenido bajo el mismo nombre no se salte sin
-// avisar), asi una recarga tras un corte no repite los ~40 MB / ~10 min enteros
 const RESUME_KEY = 'tamapoke_sent_files';
 const loadResumeSet = () => { try { return new Set(JSON.parse(localStorage.getItem(RESUME_KEY) || '[]')); } catch { return new Set(); } };
 const saveResumeSet = (s) => { try { localStorage.setItem(RESUME_KEY, JSON.stringify([...s])); } catch {} };
 const clearResumeSet = () => { try { localStorage.removeItem(RESUME_KEY); } catch {} };
 
 async function sendAll(items) {
-  const bar = document.getElementById('bar'); bar.style.display = 'block';
+  const bar = $('bar'); bar.style.display = 'block';
   const fill = bar.firstElementChild;
   const sent = loadResumeSet();
   let done = 0, fail = 0, skipped = 0;
   for (const it of items) {
     const key = `${it.name}:${it.data.length}`;
-    if (sent.has(key)) {
-      skipped++;
-    } else if (await sendOne(it.name, it.data)) {
-      sent.add(key);
-      saveResumeSet(sent);
-    } else {
-      log('   failed ' + it.name);
-      fail++;
-    }
+    if (sent.has(key)) skipped++;
+    else if (await sendOne(it.name, it.data)) { sent.add(key); saveResumeSet(sent); }
+    else { log('   failed ' + it.name); fail++; }
     done++;
     fill.style.width = (done / items.length * 100) + '%';
   }
   if (skipped) log(`Resumed: skipped ${skipped} already-sent file(s) from an earlier attempt.`);
-  if (fail === 0) clearResumeSet();  // todo confirmado: la proxima vez no se salta nada
-  log(`Done (${done - fail}/${items.length}). Restart the board (PWR button).`);
+  if (fail === 0) clearResumeSet();
+  log(`Done (${done - fail}/${items.length}). Restart the board (unplug and plug back in).`);
 }
 
-document.getElementById('connect').onclick = async () => {
+$('auto').onclick = async () => {
+  if (busy) return; busy = true; $('auto').disabled = true;
   try {
-    port = await navigator.serial.requestPort();
-    await port.open({ baudRate: 115200 });
-    reader = port.readable.getReader();
-    writer = port.writable.getWriter();
-    lineBuf = '';
-    log('Connected. Press "Load sprites".');
-    document.getElementById('auto').disabled = false;
-    document.getElementById('files').disabled = false;
-    document.getElementById('connect').disabled = true;
-  } catch (e) { log('Could not connect: ' + e.message); }
-};
-
-document.getElementById('auto').onclick = async () => {
-  if (!writer) { log('Connect the board first.'); return; }
-  document.getElementById('auto').disabled = true;
-  log('Downloading sprite bundle (~58 MB)...');
-  let items;
-  try {
-    // sprites.pak servido desde el mismo origen (GitHub Pages) -> sin lios de CORS
+    log('Downloading sprite bundle (~40 MB)...');
     const resp = await fetch('sprites.pak');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    items = parsePak(await resp.arrayBuffer());
-  } catch (e) { log('Could not download sprites.pak: ' + e.message); return; }
-  log(`${items.length} sprites. Sending over USB...`);
-  await sendAll(items);
+    const items = parsePak(await resp.arrayBuffer());
+    log(`${items.length} sprites. Sending over USB...`);
+    await drain();
+    await sendAll(items);
+  } catch (e) { log('Could not load sprites: ' + e.message); }
+  busy = false; $('auto').disabled = false;
 };
 
-document.getElementById('files').onchange = async (ev) => {
-  const files = [...ev.target.files];
+$('files').onchange = async (ev) => {
+  if (busy) return; busy = true;
   const items = [];
-  for (const f of files) items.push({ name: 'mons/' + f.name, data: new Uint8Array(await f.arrayBuffer()) });
+  for (const f of ev.target.files) items.push({ name: 'mons/' + f.name, data: new Uint8Array(await f.arrayBuffer()) });
   log(`${items.length} files. Sending...`);
+  await drain();
   await sendAll(items);
+  busy = false;
 };
+
+// ---------- Wi-Fi + location ----------
+
+let place = null;   // { lat, lon, label }
+
+function setPlace(lat, lon, label) {
+  place = { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, label };
+  $('wplacenote').textContent = `📍 ${label} (${place.lat.toFixed(2)}, ${place.lon.toFixed(2)})`;
+}
+
+$('wfind').onclick = async () => {
+  const q = $('wplace').value.trim();
+  if (q.length < 2) { $('wplacenote').textContent = 'Type a ZIP code or town first.'; return; }
+  $('wplacenote').textContent = 'Searching...';
+  try {
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name=' + encodeURIComponent(q));
+    const j = await r.json();
+    const res = j.results || [];
+    if (!res.length) { $('wplacenote').textContent = 'Nothing found. Try the town name instead.'; return; }
+    const pick = $('wpick');
+    pick.innerHTML = '';
+    res.forEach((p, i) => {
+      const o = document.createElement('option');
+      o.value = i;
+      o.textContent = [p.name, p.admin1, p.country_code].filter(Boolean).join(', ');
+      pick.appendChild(o);
+    });
+    pick.style.display = res.length > 1 ? 'block' : 'none';
+    pick.onchange = () => { const p = res[pick.value]; setPlace(p.latitude, p.longitude, pick.options[pick.selectedIndex].textContent); };
+    pick.onchange();
+  } catch (e) { $('wplacenote').textContent = 'Search failed: ' + e.message; }
+};
+
+$('wgeo').onclick = () => {
+  if (!navigator.geolocation) { $('wplacenote').textContent = 'This browser has no location. Use the ZIP search.'; return; }
+  $('wplacenote').textContent = 'Asking the browser where this computer is...';
+  navigator.geolocation.getCurrentPosition(
+    (p) => setPlace(p.coords.latitude, p.coords.longitude, "This computer's location"),
+    () => { $('wplacenote').textContent = "Couldn't get a location (common on desktops without Wi-Fi). Use the ZIP search instead."; },
+    { timeout: 30000, maximumAge: 3600000 });
+};
+
+async function talk(fn) {
+  if (!writer) { wlog('Connect the board first (step 2).'); return; }
+  if (busy) { wlog('Wait for the sprite transfer to finish first.'); return; }
+  busy = true;
+  try { await drain(); await fn(); } catch (e) { wlog('Error: ' + e.message); }
+  busy = false;
+}
+const answered = () => waitFor('DONE', 4000);
+
+$('wsend').onclick = () => talk(async () => {
+  const ssid = $('wssid').value.trim(), pass = $('wpass').value;
+  if (!ssid) { wlog('Type the Wi-Fi name first.'); return; }
+  if (/[\t\r\n]/.test(ssid + pass)) { wlog('The name or password has a tab or line break in it.'); return; }
+  if (ssid.length > 32 || pass.length > 64) { wlog('That name or password is too long for Wi-Fi.'); return; }
+  await send('TZ ' + (-new Date().getTimezoneOffset()));
+  if (!await answered()) { wlog('No answer from the board. Is TamaPoke + Weather installed (step 1)?'); return; }
+  if (place) {
+    await send(`GEO ${place.lat.toFixed(2)} ${place.lon.toFixed(2)}`);
+    if (!await answered()) { wlog('The board did not take the location.'); return; }
+  }
+  await send('WIFI ' + ssid + '\t' + pass);
+  if (!await answered()) { wlog('The board did not take the Wi-Fi details.'); return; }
+  await send('NYSNOW 0'); await answered();
+  await send('WIFISYNC'); await answered();
+  wlog(place ? `✅ Sent, with the weather for ${place.label}. In about a minute press "Check if it worked".`
+             : '✅ Sent (clock only, no location = no weather). In about a minute press "Check if it worked".');
+});
+
+$('wstat').onclick = () => talk(async () => {
+  await send('WIFISTAT');
+  let line = null;
+  for (let i = 0; i < 8; i++) {
+    const l = await readLine(3000);
+    if (l === null) break;
+    if (l.startsWith('wifi=')) { line = l; break; }
+  }
+  await answered();
+  if (!line) { wlog('No answer. Is TamaPoke + Weather installed (step 1)?'); return; }
+  const get = (k) => (line.match(new RegExp('\\b' + k + '=(\\S*)')) || [])[1];
+  const state = Number(get('state')), wx = Number(get('wx')), temp = parseInt(get('temp'), 10);
+  const reason = (line.match(/reason=\d+ ([^=]*?) rssi=/) || [])[1];
+  if (!get('wifi')) wlog('No Wi-Fi set up yet.');
+  else if (state === 2) wlog('⏳ It is connecting right now. Check again in a few seconds.');
+  else if (state === 3) wlog('✅ Connected and synced.' + (wx ? ` Weather received: ${Math.round(temp * 9 / 5 + 32)}°F.` : ' (No weather: was a location set?)'));
+  else if (state === 4) wlog('❌ The last try failed' + (reason ? ': ' + reason.trim() : '') + '. Check the name/password, and that it is a 2.4 GHz network with internet access.');
+  else wlog('Waiting for its first sync (about 15 seconds after it starts).');
+  wlog('   details: ' + line);
+});
+
+$('wforget').onclick = () => talk(async () => {
+  await send('WIFIOFF');
+  wlog(await answered() ? 'The board forgot the Wi-Fi details.' : 'No answer from the board.');
+});
 </script>
 </body>
 </html>
