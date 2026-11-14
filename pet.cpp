@@ -1,4 +1,6 @@
 #include "pet.h"
+#include "wxmood.h"  // weather add-on
+#include <Arduino.h>
 #include "dex.h"
 #include "audio.h"
 
@@ -158,6 +160,12 @@ void Pet::tick() {
   }
 
   int dJoy = -1;
+  // weather add-on: weather it loves keeps its spirits up -- JOY's base drain
+  // is skipped every other minute (the needs below still count in full)
+  {
+    const WeatherNow &w = weatherLast();
+    if (wxMood(speciesId, weatherShown(millis()), w.temp10, nullptr) > 0 && ageMinutes % 2 == 0) dJoy = 0;
+  }
   if (fullness < 30) dJoy -= 2;
   if (hygiene < 30) dJoy -= 2;
   joy = clamp100(joy + dJoy);
@@ -532,6 +540,18 @@ void Pet::clean() {
   addBond(1);
   registerCare();
   save();
+}
+
+// broom add-on (animation ported from botero50/TamaPoke): the floor gets clean,
+// the creature does not -- the bath is still the full wash
+bool Pet::sweep() {
+  if (!poops || ceremony != CER_NONE) return false;
+  hygiene = clamp100((int)hygiene + 10 * poops);   // a clean floor feels a bit cleaner too
+  poops = 0;
+  addBond(1);
+  registerCare();
+  save();
+  return true;
 }
 
 void Pet::caress() {

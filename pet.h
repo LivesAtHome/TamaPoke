@@ -99,6 +99,7 @@ public:
   void play();
   void toggleLight();  // dormir / despertar
   void clean();
+  bool sweep();   // broom add-on: sweeps the poop away (a little hygiene back); false if none
   void caress();  // tocar al bicho
   void eggTap();  // tocar el huevo: 3 toques y eclosiona
   void newEgg();   // empezar de cero con un inicial aleatorio

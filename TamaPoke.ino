@@ -31,6 +31,9 @@
 #include "pet.h"
 #include "sdmon.h"
 #include "rtcbat.h"
+#include "wifisync.h"  // weather add-on: Wi-Fi clock + Open-Meteo (ported from botero50/TamaPoke)
+#include "weather.h"
+#include "wxmood.h"
 #include "i18n.h"
 #include "audio.h"
 #include "blit.h"
@@ -131,6 +134,8 @@ int clockH = 12, clockM = 0;  // hora en edicion
 
 // escena de bano: espuma sobre el bicho y limpieza al reventar
 uint32_t bathUntil = 0;
+uint32_t sweepStart = 0, sweepUntil = 0;   // broom add-on
+uint8_t sweepN = 0;                        // how many piles it is sweeping
 bool bathPending = false;
 struct { int16_t x, y; uint8_t r, ph; } bubbles[14];
 uint32_t feedMenuUntil = 0;   // selector de comida abierto hasta este millis
@@ -462,6 +467,7 @@ void setup() {
   rtcBegin();
   batBegin();
   pwrSetup();
+  wifiBegin();  // weather add-on: loads saved Wi-Fi; first sync ~15 s after boot
   uint32_t e = rtcEpoch();
   if (e == 0) {
     // Sin pila de respaldo, el PCF85063 pierde la hora al cortar la
@@ -540,6 +546,15 @@ void loop() {
 #endif
   handleTouch();
   handleSerial();
+  // weather add-on: start a sync when one is due, and take the internet time when it lands
+  wifiTick(now, false);
+  {
+    uint32_t le;
+    if (wifiTakeTime(&le)) {
+      uint32_t cur = rtcEpoch();
+      if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
+    }
+  }
 #if BOARD_AMOLED_175C
   pollBootButton();
 #endif
@@ -688,7 +703,7 @@ void idleWait(PowerCtx c) {
   // debounce/releases/the next-click window.
   controlsBusy = pwrButton.active() || (!locked && bootButton.active());
 #endif
-  if (!controlsBusy && lightSleepAllowed(c) && millis() - lastRender >= 100 && !audioBusy()) {
+  if (!controlsBusy && !wifiBusy() && lightSleepAllowed(c) && millis() - lastRender >= 100 && !audioBusy()) {
     c.usb = usbPresentNow();
     if (!lightSleepAllowed(c)) { delay(idleDelayMs(c)); return; }
     if (!locked && digitalRead(TP_INT) == LOW) { gTouchIrq = true; delay(1); return; }
@@ -755,6 +770,40 @@ void handleSerial() {
     Serial.println("DONE");
   } else if (line.startsWith("LVL ")) {
     pet.ageMinutes = (uint32_t)line.substring(4).toInt() * MINUTES_PER_LEVEL;
+    Serial.println("DONE");
+  } else if (line.startsWith("WIFI ")) {     // weather add-on: WIFI <ssid><TAB><password>
+    String rest = line.substring(5);
+    int tab = rest.indexOf('\t');
+    String ssid = tab >= 0 ? rest.substring(0, tab) : rest;
+    String pass = tab >= 0 ? rest.substring(tab + 1) : String("");
+    if (ssid.length() == 0 || ssid.length() > 32 || pass.length() > 64) Serial.println("ERR");
+    else { wifiSetNetwork(ssid.c_str(), pass.c_str()); Serial.printf("wifi=%s\n", wifiNetwork()); Serial.println("DONE"); }
+  } else if (line == "WIFIOFF") {
+    wifiForget();
+    Serial.println("DONE");
+  } else if (line.startsWith("NYSNOW ")) {
+    wifiSetNySnow(line.substring(7).toInt() != 0);
+    Serial.println("DONE");
+  } else if (line == "WIFISCAN") {
+    wifiScanPrint();
+    Serial.println("DONE");
+  } else if (line == "WIFISYNC") {
+    wifiSyncNow();
+    Serial.println("DONE");
+  } else if (line.startsWith("TZ ")) {        // minutes east of UTC
+    wifiSetTz((int16_t)line.substring(3).toInt());
+    Serial.println("DONE");
+  } else if (line.startsWith("GEO ")) {       // GEO <lat> <lon>
+    String rest = line.substring(4);
+    int sp = rest.indexOf(' ');
+    if (sp < 0) Serial.println("ERR");
+    else { wifiSetPlace((float)atof(rest.substring(0, sp).c_str()), (float)atof(rest.substring(sp + 1).c_str())); Serial.println("DONE"); }
+  } else if (line == "WIFISTAT") {
+    char d[120];
+    wifiDiag(d, sizeof(d));
+    const WeatherNow &w = weatherLast();
+    Serial.printf("wifi=%s state=%u last=%u %s wx=%u raw=%d temp=%dC precip10=%u cloud=%u\n", wifiNetwork(),
+                  wifiState(), wifiLastSync(), d, weatherShown(millis()), w.rawCode, w.tempC, w.precip10, w.cloud);
     Serial.println("DONE");
   } else if (line.startsWith("TIME ")) {
     uint32_t e = (uint32_t)line.substring(5).toInt();
@@ -1187,6 +1236,11 @@ void onTap(int16_t x, int16_t y) {
       return;
     }
   }
+  // broom add-on: tap a pile of poop to sweep the floor
+  if (pet.poops && y >= 236 && y < 312 && x >= 28 && x <= 36 + pet.poops * 46 + 40) {
+    startSweep();
+    return;
+  }
   // tocar al bicho = caricia
   if (inPetZone(x, y)) {
     Serial.println("PET");
@@ -1239,6 +1293,83 @@ void drawClouds(uint32_t now, uint16_t col) {
   }
 }
 
+// ---------- weather add-on (sky drawing ported from botero50/TamaPoke) ----------
+static float snowDepth = 0;   // 0..1: snow on the ground builds over ~20 min of snowing, melts over ~1 h
+
+// a heavier, slower cloud deck for grey days (4 puffs instead of the fair-weather 2)
+static void drawOvercast(uint32_t now, uint16_t col) {
+  for (int k = 0; k < 4; k++) {
+    int cx = (int)((now / 90 + k * 150) % 600) - 60;
+    int cy = 56 + (k % 2) * 38;
+    gfx->fillCircle(cx, cy, 24, col);
+    gfx->fillCircle(cx + 26, cy + 4, 19, col);
+    gfx->fillCircle(cx - 22, cy + 6, 17, col);
+  }
+}
+
+// a horizontal run that wraps around the screen edge
+static void wrapHLine(int x, int y, int w, uint16_t col) {
+  x = ((x % LCD_WIDTH) + LCD_WIDTH) % LCD_WIDTH;
+  if (x + w <= LCD_WIDTH) { gfx->drawFastHLine(x, y, w, col); return; }
+  gfx->drawFastHLine(x, y, LCD_WIDTH - x, col);
+  gfx->drawFastHLine(0, y, w - (LCD_WIDTH - x), col);
+}
+
+// falling weather, drawn over the finished scene and behind the creature
+static void drawSkyWeather(uint32_t now, bool night) {
+  uint8_t wx = weatherShown(now);
+  static uint32_t lastMs = 0;
+  uint32_t dt = lastMs ? now - lastMs : 0;
+  lastMs = now;
+  if (dt > 5000) dt = 5000;
+  snowDepth += wxIsSnow(wx) ? dt / (20.0f * 60000.0f) : -(dt / (60.0f * 60000.0f));
+  if (snowDepth < 0) snowDepth = 0;
+  if (snowDepth > 1) snowDepth = 1;
+  if (snowDepth > 0.01f) {
+    int sh = 4 + (int)(snowDepth * 24);
+    gfx->fillRoundRect(-60, HORIZON - 14, 586, 14 + sh, 22, UI_WHITE);   // the hill turns white
+    for (int k = 0; k < 9; k++)                                          // and drifts on the ground
+      gfx->fillCircle(20 + k * 54, HORIZON + 38 + (k % 3) * 14, 4 + (int)(snowDepth * 10), UI_WHITE);
+  }
+  if (wx == WX_NONE) return;
+  if (wx == WX_FOG) {                // pale mist drifting slowly across
+    uint16_t mist = night ? C565(0x4c, 0x52, 0x60) : C565(0xec, 0xf0, 0xf4);
+    for (int b = 0; b < 4; b++) {
+      int y0 = 118 + b * 46 + (int)(sinf(now / 3000.0f + b) * 6);
+      int off = (int)(now / (60 + b * 15)) + b * 120;
+      for (int y = y0; y < y0 + 22; y += 2) wrapHLine(off + (y % 6) * 9, y, 280, mist);
+    }
+  }
+  if (wx == WX_RAIN || wx == WX_STORM) {
+    uint16_t pc = C565(0x6c, 0x84, 0xa0);           // puddles, and the drops landing in them
+    static const int16_t PX[3] = { 40, 330, 400 };
+    for (int k = 0; k < 3; k++) {
+      gfx->fillRoundRect(PX[k], 292 + k * 4, 54, 8, 4, pc);
+      uint32_t ph = (now / 70 + k * 7) % 12;
+      if (ph < 3) {
+        int sx = PX[k] + 12 + (int)((now / 840 + k * 13) % 30), sy = 294 + k * 4;
+        gfx->drawLine(sx, sy, sx - 4 - (int)ph * 2, sy - 6 - (int)ph * 2, C565(0xd8, 0xe4, 0xf4));
+        gfx->drawLine(sx, sy, sx + 4 + (int)ph * 2, sy - 6 - (int)ph * 2, C565(0xd8, 0xe4, 0xf4));
+      }
+    }
+    uint16_t rc = C565(0xc8, 0xd8, 0xf0);
+    int n = wx == WX_STORM ? 70 : 44;
+    for (int k = 0; k < n; k++) {
+      int x = (int)((k * 97 + now / 6) % (LCD_WIDTH + 20)) - 10;
+      int y = (int)((k * 151 + now / 2) % LCD_HEIGHT);
+      gfx->drawLine(x, y, x - 4, y + 14, rc);
+    }
+    if (wx == WX_STORM && !night && now % 20000 < 120)   // a lightning flash about every 20 s (silent)
+      gfx->fillRect(0, 0, LCD_WIDTH, 140, C565(0xf0, 0xf4, 0xff));
+  } else if (wxIsSnow(wx)) {
+    for (int k = 0; k < 40; k++) {
+      int x = (int)((k * 113 + (int)(sinf(now / 900.0f + k) * 12)) % LCD_WIDTH);
+      int y = (int)((k * 131 + now / 14) % LCD_HEIGHT);
+      gfx->fillCircle(x, y, 2 + (k % 2), UI_WHITE);
+    }
+  }
+}
+
 void drawScene(uint8_t biome, uint32_t now, bool night) {
   int h = sceneHour();
   uint16_t top, bot;
@@ -1247,12 +1378,23 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
   else if (h < 18)      { top = C565(0x8f, 0xc8, 0xea); bot = C565(0xdc, 0xee, 0xe6); }  // dia
   else                  { top = C565(0xc7, 0x5a, 0x4a); bot = C565(0xf0, 0xae, 0x64); }  // atardecer
 
+  // weather add-on: grey skies outside turn the sky grey too, darker when it rains
+  uint8_t wx = weatherShown(now);
+  bool overcast = wx >= WX_CLOUDY;
+  if (overcast) {
+    uint16_t grey = night ? C565(0x22, 0x26, 0x30) : wx >= WX_RAIN ? C565(0x88, 0x90, 0x9c) : C565(0xb4, 0xbc, 0xc6);
+    top = lerp565(top, grey, 2, 3);
+    bot = lerp565(bot, grey, 1, 2);
+  }
+
   // cielo en bandas
   for (int y = 0; y < HORIZON; y += 8)
     gfx->fillRect(0, y, LCD_WIDTH, 8, lerp565(top, bot, y, HORIZON));
 
-  // sol o luna
-  if (night) {
+  // sol o luna (weather add-on: hidden behind a cloud deck when it is grey outside)
+  if (overcast) {
+    drawOvercast(now, night ? C565(0x40, 0x46, 0x54) : wx >= WX_RAIN ? C565(0xa0, 0xa6, 0xb0) : C565(0xe4, 0xe8, 0xec));
+  } else if (night) {
     gfx->fillCircle(360, 78, 24, C565(0xe8, 0xee, 0xf5));
     gfx->fillCircle(370, 72, 22, lerp565(top, bot, 78, HORIZON));  // creciente
     for (auto &st : STARS) gfx->fillRect(st[0], st[1], 4, 4, UI_WHITE);
@@ -1309,6 +1451,7 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
       for (int b = -1; b <= 1; b++)
         gfx->fillRect(gx + b * 5, HORIZON + 6, 2, 8 + (b == 0 ? 4 : 0), dk);
   }
+  drawSkyWeather(now, night);  // weather add-on
 }
 
 // primera partida: elige inicial entre Bulbasaur / Charmander / Squirtle
@@ -1599,6 +1742,7 @@ bool render() {
     drawPet();
     drawBath();
     drawPoops();
+    drawSweep();  // broom add-on
     // panel inferior: base limpia para barras y botones sobre el paisaje
     gfx->fillRect(0, 312, LCD_WIDTH, LCD_HEIGHT - 312, gNight ? UI_BG_NIGHT : UI_BG_DAY);
     drawBars();
@@ -2680,8 +2824,22 @@ void drawBattery() {
   }
 }
 
+// weather add-on: the outside temperature in Fahrenheit, top centre beside the battery
+void drawOutsideTemp() {
+  if (weatherShown(millis()) == WX_NONE) return;
+  int f = (int)lroundf(weatherLast().temp10 * 0.18f + 32.0f);
+  char t[8];
+  snprintf(t, sizeof(t), "%dF", f);
+  gfx->setTextColor(inkColor());
+  setSize(2);
+  int x = batPercent() < 0 ? centerX(t, 2) : CX + 20;   // no battery: centred where the battery would be
+  setCur(x, 10);
+  printT(t);
+}
+
 void drawHeader(const char *name, uint16_t nameColor, const char *msg) {
   drawBattery();
+  drawOutsideTemp();
   gfx->setTextColor(nameColor);
   setSize(3);
   setCur(centerX(name, 3), 52);
@@ -2925,7 +3083,7 @@ void drawPet() {
 // ---------- escena de bano ----------
 
 void startBath() {
-  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil) return;
+  if (pet.isEgg() || pet.sleeping || pet.ceremony || bathUntil || sweepUntil) return;
   bathUntil = millis() + 3000;
   bathPending = true;
   int cx = (int)beh.x;
@@ -3154,8 +3312,75 @@ void overlayMouth(const Species &sp, int x, int y, int s, bool open) {
 }
 
 void drawPoops() {
+  if (sweepUntil) return;  // broom add-on: drawSweep() draws them while it works
   for (int i = 0; i < pet.poops; i++) {
     drawMap(SPR_POOP, 32, 36 + i * 46, 244, 2, false);
+  }
+}
+
+// ---------- broom add-on (animation ported from botero50/TamaPoke, MIT) ----------
+#define SWEEP_MS 2000
+
+void startSweep() {
+  if (!pet.poops || sweepUntil || bathUntil || pet.ceremony) return;
+  sweepStart = millis();
+  sweepUntil = sweepStart + SWEEP_MS;
+  sweepN = pet.poops;
+  if (!pet.sleeping) sfxPlay(SFX_TAP);
+}
+
+// A broom sweeps from right to left along the bottom left, pushing the piles
+// ahead of it; they shrink away, dust puffs trail it, and it ends in a sparkle.
+void drawSweep() {
+  if (!sweepUntil) return;
+  uint32_t now = millis();
+  if (!timeLeft(sweepUntil)) {
+    sweepUntil = 0;
+    if (pet.sweep() && !pet.sleeping) sfxPlay(SFX_HEART);
+    return;
+  }
+  uint32_t t = now - sweepStart;
+  float p = t / (float)(SWEEP_MS - 400);             // the sweep itself; the last 400 ms sparkle
+  if (p > 1) p = 1;
+  int bx = 260 - (int)(p * 300);                    // the bristles' left edge
+  const int ground = 306;
+  static uint32_t lastSwish = 0;
+  if (p < 1 && now - lastSwish > 380 && !pet.sleeping) { lastSwish = now; sfxPlay(SFX_TAP); }
+  for (int i = 0; i < sweepN; i++) {                 // the piles: still there, or pushed and shrinking
+    int px = 36 + i * 46, py = 244;
+    if (bx > px + 40) { drawMap(SPR_POOP, 32, px, py, 2, false); continue; }
+    int pushed = px + 40 - bx;
+    if (pushed > 70) continue;                      // gone
+    int sc = pushed < 30 ? 2 : 1;
+    int qx = bx - (sc == 2 ? 44 : 28), qy = sc == 2 ? py : py + 32;
+    drawMap(SPR_POOP, 32, qx, qy, sc, false);
+  }
+  const uint16_t dust = C565(0xc8, 0xbe, 0xae);
+  for (int k = 0; k < 6; k++) {                      // dust behind the broom
+    int age = (int)((t / 60 + k * 7) % 10);
+    int dx = bx + 70 + k * 9 + age * 2, dy = ground - 6 - age * 2 - (k & 1) * 5;
+    int r = 6 - age / 2;
+    if (r > 0 && dx < 300) gfx->fillCircle(dx, dy, r, dust);
+  }
+  if (p < 1) {                                       // the broom: a handle up to the right, the bristles
+    int sway = (int)(sinf(t * 0.025f) * 6);
+    int hx = bx + 70 + sway, hy = ground - 26;
+    for (int w = -2; w <= 2; w++) gfx->drawLine(hx + w, hy, hx + 70 + w, hy - 110, C565(0xb0, 0x7a, 0x45));
+    gfx->drawLine(hx - 3, hy, hx + 67, hy - 110, UI_INK);
+    gfx->fillRect(hx - 8, hy - 4, 18, 8, C565(0xe0, 0xb8, 0x60));          // the band
+    gfx->drawRect(hx - 8, hy - 4, 18, 8, UI_INK);
+    gfx->fillTriangle(bx, ground, bx + 92, ground, hx, hy + 2, C565(0xf8, 0xd9, 0x90));
+    gfx->drawLine(bx, ground, bx + 92, ground, UI_INK);
+    gfx->drawLine(bx, ground, hx, hy + 2, UI_INK);
+    gfx->drawLine(bx + 92, ground, hx, hy + 2, UI_INK);
+    for (int k = 1; k < 8; k++) gfx->drawLine(hx, hy + 4, bx + k * 12 + sway / 3, ground - 1, C565(0xe0, 0xb8, 0x60));
+  } else {                                           // a sparkle where the piles were
+    for (int i = 0; i < sweepN; i++) {
+      int sx = 68 + i * 46, sy = 272, r = 4 + (int)((t / 50 + i * 3) % 8);
+      gfx->drawFastHLine(sx - r, sy, 2 * r + 1, UI_WHITE);
+      gfx->drawFastVLine(sx, sy - r, 2 * r + 1, UI_WHITE);
+      gfx->fillCircle(sx, sy, 2, C565(0xff, 0xd9, 0x5e));
+    }
   }
 }
 
@@ -3223,6 +3448,7 @@ const char *eggMsg() {
 const char *statusMsg() {
   if (pet.evolving()) return T(S_EVOLVING);
   if (bathUntil) return "Splish splash!";  // onomatopeya universal
+  if (sweepUntil) return "Swish swish!";   // broom add-on
   if (pet.sleeping) return "Zzz...";
   if (pet.eating()) return T(S_EATING);
   if (pet.showHeart()) return T(S_LIKES);
@@ -3232,6 +3458,11 @@ const char *statusMsg() {
   if (pet.joy < 25) return T(S_SAD);
   if (pet.weight > 60) return T(S_CHUBBY);
   if (pet.shiny && pet.ageMinutes < 15) return T(S_IS_SHINY);
+  {  // weather add-on: what it thinks of the weather outside
+    const char *wm = nullptr;
+    wxMood(pet.speciesId, weatherShown(millis()), weatherLast().temp10, &wm);
+    if (wm) return wm;
+  }
   return T(S_HAPPY);
 }
 

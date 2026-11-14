@@ -9,6 +9,11 @@
 ![Languages](https://img.shields.io/badge/languages-9-FFCB05)
 [![Stars](https://img.shields.io/github/stars/socquique/TamaPoke?style=flat&logo=github&color=yellow)](https://github.com/socquique/TamaPoke/stargazers)
 
+> **About this fork:** this adds live weather, a broom sweep, and weather moods to
+> Quique Tortosa's original TamaPoke. The changes were made with AI assistance
+> (Claude), and parts were ported from [botero50's TamaPoke fork](https://github.com/botero50/TamaPoke).
+> Tested on real hardware, but not reviewed by the original author.
+
 A gen-1-Pokémon-inspired tamagotchi for the
 **Waveshare ESP32-S3-Touch-AMOLED-1.75** (round 466×466 AMOLED, CO5300 driver
 over QSPI, CST9217 touch over I2C). Raise any of the 151, evolve it, train it
