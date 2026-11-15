@@ -1331,6 +1331,17 @@ enum : uint8_t { SKY_NIGHT, SKY_DAWN, SKY_DAY, SKY_DUSK };
 // where the sun and moon sit: open sky under the header text, right of centre
 #define MOON_X 382
 #define MOON_Y 150
+// 0 at sunrise .. 1 at sunset (real times when known, else 6:00-18:00)
+float sunProgress() {
+  uint32_t e = pet.lastSeenEpoch;
+  int m = e ? (int)((e / 60) % 1440) : 13 * 60;
+  const WeatherNow &w = weatherLast();
+  int sr = 6 * 60, ss = 18 * 60;
+  if (w.sunriseMin >= 0 && w.sunsetMin > w.sunriseMin) { sr = w.sunriseMin; ss = w.sunsetMin; }
+  float f = (m - sr) / (float)(ss - sr);
+  return f < 0 ? 0 : f > 1 ? 1 : f;
+}
+
 uint8_t skyPhase() {
   uint32_t e = pet.lastSeenEpoch;
   int m = e ? (int)((e / 60) % 1440) : 13 * 60;
@@ -1481,10 +1492,18 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
     gfx->fillCircle(MOON_X + 9, MOON_Y - 6, 20, lerp565(top, bot, MOON_Y, HORIZON));  // creciente
     for (auto &st : STARS) gfx->fillRect(st[0], st[1], 4, 4, UI_WHITE);
   } else if (ph != SKY_DUSK) {
-    gfx->fillCircle(MOON_X, MOON_Y + 2, 24, ph == SKY_DAWN ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
+    // sun add-on: the sun crosses the sky with the real time of day -- low on the
+    // left at sunrise, highest (just under the header text) at midday, low on the right
+    float f = sunProgress();
+    int sx = 60 + (int)(f * 346);
+    int sy = 205 - (int)(sinf(f * 3.14159f) * 75);
+    gfx->fillCircle(sx, sy, 24, ph == SKY_DAWN ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
     drawClouds(now, C565(0xff, 0xff, 0xff));
-  } else {
-    gfx->fillCircle(CX, HORIZON - 6, 34, C565(0xff, 0xf1, 0xc8));  // sol poniente
+  } else {                     // dusk: the same sun, low on the right and turning orange
+    float f = sunProgress();
+    int sx = 60 + (int)(f * 346);
+    int sy = 205 - (int)(sinf(f * 3.14159f) * 75);
+    gfx->fillCircle(sx, sy, 26, C565(0xff, 0xb8, 0x6a));
   }
 
   // mar de la playa: una franja de agua sobre la arena
