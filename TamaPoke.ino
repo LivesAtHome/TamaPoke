@@ -145,6 +145,13 @@ uint32_t feedMenuUntil = 0;   // selector de comida abierto hasta este millis
 // minijuego "toques": mantener la pokeball en el aire
 bool gameOpen = false;
 bool memOpen = false;            // memory add-on: the pairs game
+// clock-guard add-on: with Wi-Fi set up, the time spent away is counted only once
+// the real internet time arrives. Without a backup battery the RTC can wake up
+// from a power cut with a scrambled date that still looks valid, and counting
+// from that aged a one-day-old pet by two weeks in one go.
+bool awayPending = false;
+uint32_t awayPendingSince = 0;
+#define AWAY_WAIT_MS 120000UL    // no internet time by then: trust the RTC, as before
 uint32_t playMenuUntil = 0;      // memory add-on: the Ball / Memory picker
 #define PLAYMENU_X (167 + UI_DX)
 #define PLAYMENU_Y 288
@@ -490,7 +497,13 @@ void setup() {
     Serial.printf("RTC sin hora: sembrado en %u%s\n", seed,
                   seen > 1767225600UL ? " (desde la ultima hora guardada)" : "");
   }
-  pet.syncClock(e);
+  if (wifiNetwork()[0]) {            // clock-guard add-on: wait for the internet time
+    awayPending = true;
+    awayPendingSince = millis();
+    pet.lastSeenEpoch = pet.savedEpoch();   // until then, saves keep the old reference
+  } else {
+    pet.syncClock(e);
+  }
 
   audioBegin();  // ES8311 + I2S + amplificador (suena un jingle de arranque)
 
@@ -558,7 +571,15 @@ void loop() {
     uint32_t le;
     if (wifiTakeTime(&le)) {
       uint32_t cur = rtcEpoch();
-      if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
+      if (awayPending) {                // clock-guard add-on: now count the time away, from the real time
+        awayPending = false;
+        rtcSetEpoch(le);
+        pet.syncClock(le);
+      } else if (!cur || (cur > le ? cur - le : le - cur) > 60) { rtcSetEpoch(le); pet.setClock(le); }
+    }
+    if (awayPending && millis() - awayPendingSince > AWAY_WAIT_MS) {   // no internet: the RTC it is
+      awayPending = false;
+      pet.syncClock(rtcEpoch());
     }
   }
 #if BOARD_AMOLED_175C
@@ -600,7 +621,7 @@ void loop() {
   if (now - lastClock > 30000) {
     lastClock = now;
     uint32_t e = rtcEpoch();
-    if (e) pet.lastSeenEpoch = e;
+    if (e && !awayPending) pet.lastSeenEpoch = e;   // clock-guard add-on: not from an unchecked RTC
   }
 
   // latido de salud cada 5 min (para el soak test; se descarta si no hay monitor)
@@ -775,8 +796,14 @@ void handleSerial() {
     }
     Serial.println("DONE");
   } else if (line.startsWith("LVL ")) {
-    pet.ageMinutes = (uint32_t)line.substring(4).toInt() * MINUTES_PER_LEVEL;
-    Serial.println("DONE");
+    long lv = line.substring(4).toInt();     // LVL <n>: set the level (repair tool on the installer page)
+    if (lv < 1 || lv > 999) { Serial.println("ERR"); }
+    else {
+      pet.ageMinutes = (uint32_t)(lv - 1) * MINUTES_PER_LEVEL;
+      pet.saveNow();
+      Serial.printf("level=%u\n", pet.level());
+      Serial.println("DONE");
+    }
   } else if (line.startsWith("WIFI ")) {     // weather add-on: WIFI <ssid><TAB><password>
     String rest = line.substring(5);
     int tab = rest.indexOf('\t');

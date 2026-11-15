@@ -90,7 +90,8 @@ public:
     return !isEgg() && (speciesId % 3) == color;  // gusto oculto por especie
   }
   void playResult(uint8_t score);  // recompensa del minijuego (entrena VEL)
-  void memoryResult(uint8_t pairs);  // memory add-on: a calm game for the mind (no stat training)
+  void memoryResult(uint8_t pairs);
+  void saveNow() { save(); }       // for the LVL repair command  // memory add-on: a calm game for the mind (no stat training)
   uint8_t trainStrength(uint16_t hits);  // saco de entrenamiento (entrena FUE)
 
   // stats de combate: base real de gen 1 x genes + nivel + entrenamiento
