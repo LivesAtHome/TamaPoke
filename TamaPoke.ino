@@ -1328,6 +1328,9 @@ int sceneHour() {
 // sun add-on: night, dawn, day or dusk from the real sunrise and sunset at your
 // place (from the weather), or the original fixed hours until the first sync
 enum : uint8_t { SKY_NIGHT, SKY_DAWN, SKY_DAY, SKY_DUSK };
+// where the sun and moon sit: open sky under the header text, right of centre
+#define MOON_X 382
+#define MOON_Y 150
 uint8_t skyPhase() {
   uint32_t e = pet.lastSeenEpoch;
   int m = e ? (int)((e / 60) % 1440) : 13 * 60;
@@ -1473,11 +1476,12 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
   if (overcast) {
     drawOvercast(now, night ? C565(0x40, 0x46, 0x54) : wx >= WX_RAIN ? C565(0xa0, 0xa6, 0xb0) : C565(0xe4, 0xe8, 0xec));
   } else if (night) {
-    gfx->fillCircle(360, 78, 24, C565(0xe8, 0xee, 0xf5));
-    gfx->fillCircle(370, 72, 22, lerp565(top, bot, 78, HORIZON));  // creciente
+    // moved below the name and status line (they used to hide the level at night)
+    gfx->fillCircle(MOON_X, MOON_Y, 22, C565(0xe8, 0xee, 0xf5));
+    gfx->fillCircle(MOON_X + 9, MOON_Y - 6, 20, lerp565(top, bot, MOON_Y, HORIZON));  // creciente
     for (auto &st : STARS) gfx->fillRect(st[0], st[1], 4, 4, UI_WHITE);
   } else if (ph != SKY_DUSK) {
-    gfx->fillCircle(360, 84, 26, ph == SKY_DAWN ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
+    gfx->fillCircle(MOON_X, MOON_Y + 2, 24, ph == SKY_DAWN ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
     drawClouds(now, C565(0xff, 0xff, 0xff));
   } else {
     gfx->fillCircle(CX, HORIZON - 6, 34, C565(0xff, 0xf1, 0xc8));  // sol poniente
