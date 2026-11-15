@@ -539,9 +539,27 @@ void ensureMon() {
   }
 }
 
+// ---------- slowness log (diagnostics): which part of a loop pass was slow ----------
+// A pass longer than SLOW_LOOP_MS prints one "SLOW" line on the serial port with the
+// time each part took; the installer page can show these while you play.
+#define SLOW_LOOP_MS 300
+static const char *const PROF_NAMES[] = { "update", "misc", "touch", "serial", "wifi", "sprite", "save", "pre", "render", "idle" };
+static uint32_t gProf[10], gProfLast, gProfStart;
+static inline void profStart() { gProfStart = gProfLast = millis(); memset(gProf, 0, sizeof(gProf)); }
+static inline void profMark(uint8_t i) { uint32_t t = millis(); gProf[i] += t - gProfLast; gProfLast = t; }
+static void profEnd() {
+  uint32_t total = millis() - gProfStart;
+  if (total < SLOW_LOOP_MS) return;
+  Serial.printf("SLOW %lums", (unsigned long)total);
+  for (int i = 0; i < 10; i++) if (gProf[i] >= 20) Serial.printf(" %s=%lu", PROF_NAMES[i], (unsigned long)gProf[i]);
+  Serial.printf(" [mem=%d ball=%d heap=%u]\n", memOpen ? 1 : 0, gameOpen ? 1 : 0, ESP.getFreeHeap());
+}
+
 void loop() {
   uint32_t now = millis();
+  profStart();
   pet.update(now);
+  profMark(0);
 
   // el amplificador sigue al estado de sueno (la llamada sale sola si no cambia).
   // Aqui cubre todas las vias: el boton de luz, el sueno nocturno y el que llega
@@ -563,8 +581,11 @@ void loop() {
 #if BOARD_AMOLED_175C
   pollPwrButton();  // lock input before handling touch/BOOT in this pass
 #endif
+  profMark(1);
   handleTouch();
+  profMark(2);
   handleSerial();
+  profMark(3);
   // weather add-on: start a sync when one is due, and take the internet time when it lands
   wifiTick(now, false);
   {
@@ -585,7 +606,9 @@ void loop() {
 #if BOARD_AMOLED_175C
   pollBootButton();
 #endif
+  profMark(4);
   ensureMon();
+  profMark(5);
 #if BOARD_AMOLED_175C
   updateScreenLock(now);
   now = millis();  // panel sleep/wake commands include controller settling delays
@@ -615,6 +638,7 @@ void loop() {
   if (pet.savePending() && (screenOff || lockBlank || dimStage >= 1 || pet.sleeping)) {
     pet.flushSave();
   }
+  profMark(6);
 
   // anota la hora real cada 30 s (se persiste en cada save del juego)
   static uint32_t lastClock = 0;
@@ -656,7 +680,9 @@ void loop() {
   bool drewFrame = false;
   if (interval && now - lastRender >= interval) {
     lastRender = now;
+    profMark(7);
     drewFrame = render();
+    profMark(8);
 #if BOARD_AMOLED_175C
     // renderSack's capture worker has joined: only the loop changes hits/UI.
     if (sackOpen && !screenIsLocked()) drainTrainingTouch();
@@ -665,6 +691,8 @@ void loop() {
   // cede la CPU en los pases que no dibujan: sin esto el loop gira a pleno rendimiento
   // entre frames; 1 ms no se nota en el tactil (se lee cada 20 ms) y el frame no se retrasa
   if (!drewFrame) idleWait(pc);
+  profMark(9);
+  profEnd();
 }
 
 // estado de consumo actual (ver power.h)

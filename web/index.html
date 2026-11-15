@@ -159,6 +159,19 @@
     <pre class="log" id="lvllog"></pre>
   </div>
 
+  <h2>📋 Slowness log (for troubleshooting)</h2>
+  <div class="step">
+    <p>With the board connected (step 2), press <b>Start</b> and use the board as normal. Whenever
+       it stalls for more than a third of a second, a line appears here saying which part was busy.
+       Press <b>Stop</b> when done, then copy the lines.</p>
+    <div class="row">
+      <button id="logstart" disabled>▶️ Start</button>
+      <button id="logstop" disabled>⏹ Stop</button>
+      <span id="logcount" class="note"></span>
+    </div>
+    <pre class="log" id="slowlog"></pre>
+  </div>
+
   <h2>How to play</h2>
   <p>Care for your egg until it hatches, feed it, play, train it and complete them all. Tap the
      creature to pet it; <b>⚽ Play lets you pick the ball game or Memory</b>; <b>tap the poop to sweep it</b> (the bath still does the full wash); swipe
@@ -184,7 +197,7 @@ document.getElementById('installer').setAttribute('manifest', 'manifest.json?t='
 
 const mkLog = (id) => (m) => { const el = document.getElementById(id); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
-const log = mkLog('log'), wlog = mkLog('wifilog'), hlog = mkLog('hlog'), llog = mkLog('lvllog');
+const log = mkLog('log'), wlog = mkLog('wifilog'), hlog = mkLog('hlog'), llog = mkLog('lvllog'), slog = mkLog('slowlog');
 const $ = (id) => document.getElementById(id);
 
 const supported = 'serial' in navigator;
@@ -234,7 +247,7 @@ $('connect').onclick = async () => {
     writer = port.writable.getWriter();
     lineBuf = '';
     $('connstate').textContent = '✅ Connected';
-    for (const id of ['auto', 'files', 'wsend', 'wstat', 'wforget', 'hshow', 'lvlset']) $(id).disabled = false;
+    for (const id of ['auto', 'files', 'wsend', 'wstat', 'wforget', 'hshow', 'lvlset', 'logstart']) $(id).disabled = false;
     $('connect').disabled = true;
   } catch (e) { $('connstate').textContent = 'Could not connect: ' + e.message; }
 };
@@ -435,6 +448,31 @@ $('lvlset').onclick = async () => {
   } catch (e) { llog('Error: ' + e.message); }
   busy = false;
 };
+
+let logging = false;
+$('logstart').onclick = async () => {
+  if (!writer) { slog('Connect the board first (step 2).'); return; }
+  if (busy) { slog('Wait for the other transfer to finish first.'); return; }
+  busy = true; logging = true;
+  $('logstart').disabled = true; $('logstop').disabled = false;
+  const t0 = Date.now(); let n = 0;
+  slog('Listening... use the board now.');
+  try {
+    while (logging) {
+      const l = await readLine(500);
+      if (l === null) continue;
+      if (l.startsWith('SLOW') || l.startsWith('HEALTH')) {
+        const sec = ((Date.now() - t0) / 1000).toFixed(0);
+        slog(`[${sec}s] ${l}`);
+        if (l.startsWith('SLOW')) $('logcount').textContent = `${++n} stall(s)`;
+      }
+    }
+  } catch (e) { slog('Error: ' + e.message); }
+  slog(n ? `Stopped. ${n} stall(s) recorded.` : 'Stopped. No stalls recorded.');
+  busy = false;
+  $('logstart').disabled = false; $('logstop').disabled = true;
+};
+$('logstop').onclick = () => { logging = false; };
 
 $('wforget').onclick = () => talk(async () => {
   await send('WIFIOFF');
