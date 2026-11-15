@@ -22,7 +22,8 @@
 - 🌦️ **Live weather.** Every 30 minutes the board briefly joins your Wi-Fi (2.4 GHz), sets its clock
   from the internet and fetches the weather from [Open-Meteo](https://open-meteo.com), then turns the
   radio off. Grey skies, rain with puddles, snow that builds up on the ground, fog and storms are
-  drawn into the sky, and the outside temperature (°F) shows at the top.
+  drawn into the sky, and the outside temperature (°F) shows at the top. Dawn, day, dusk and night
+  follow the **real sunrise and sunset** at your place, and the clock follows daylight saving.
 - 🧹 **Broom.** Tap a pile of poop to sweep it away with a little animation (a bit of hygiene back).
   The bath still does the full wash.
 - 💧🔥 **Weather moods.** Your Pokémon reacts to the real weather by type: water and grass types love

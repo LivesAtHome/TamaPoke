@@ -1,4 +1,5 @@
 // Ported from botero50/TamaPoke (MIT) for a weather-only add-on to the original TamaPoke.
+#include <ctype.h>
 #include "weather.h"
 #include <string.h>
 #include <stdlib.h>
@@ -73,6 +74,21 @@ bool parseOpenMeteo(const char *body, WeatherNow &out) {
     double p2;
     bool hp2 = numAfter(cur2, "\"precipitation\"", p2);
     w.nyKind = wxHonest(wmoDrizzle((int)c2) ? WX_CLOUDY : wmoKind((int)c2), hp2, hp2 ? (uint16_t)(p2 * 10 + 0.5) : 0, false, 0);
+  }
+  // sun add-on: "daily":{..."sunrise":["2026-11-14T07:03"],"sunset":["2026-11-14T17:41"]}
+  // (local times, because of timezone=auto); the first "daily" is this place's
+  const char *daily = strstr(body, "\"daily\":");
+  if (daily) {
+    auto hhmm = [&](const char *key) -> int {
+      const char *p = strstr(daily, key);
+      if (!p) return -1;
+      p = strchr(p, 'T');
+      if (!p || !isdigit((unsigned char)p[1]) || !isdigit((unsigned char)p[2]) || p[3] != ':') return -1;
+      int h = (p[1] - '0') * 10 + (p[2] - '0'), m = (p[4] - '0') * 10 + (p[5] - '0');
+      return (h < 24 && m < 60) ? h * 60 + m : -1;
+    };
+    int sr = hhmm("\"sunrise\""), ss = hhmm("\"sunset\"");
+    if (sr >= 0 && ss > sr) { w.sunriseMin = (int16_t)sr; w.sunsetMin = (int16_t)ss; }
   }
   double off;
   if (numAfter(body, "\"utc_offset_seconds\"", off) && off > -14 * 3600 - 1 && off < 14 * 3600 + 1) {

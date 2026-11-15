@@ -1298,6 +1298,24 @@ int sceneHour() {
   return e ? (int)((e / 3600) % 24) : 13;
 }
 
+// sun add-on: night, dawn, day or dusk from the real sunrise and sunset at your
+// place (from the weather), or the original fixed hours until the first sync
+enum : uint8_t { SKY_NIGHT, SKY_DAWN, SKY_DAY, SKY_DUSK };
+uint8_t skyPhase() {
+  uint32_t e = pet.lastSeenEpoch;
+  int m = e ? (int)((e / 60) % 1440) : 13 * 60;
+  const WeatherNow &w = weatherLast();
+  if (w.sunriseMin >= 0 && w.sunsetMin > w.sunriseMin) {
+    int sr = w.sunriseMin, ss = w.sunsetMin;
+    if (m < sr - 30 || m >= ss + 30) return SKY_NIGHT;
+    if (m < sr + 45) return SKY_DAWN;
+    if (m < ss - 45) return SKY_DAY;
+    return SKY_DUSK;
+  }
+  int h = m / 60;
+  return (h < 6 || h >= 20) ? SKY_NIGHT : h < 8 ? SKY_DAWN : h < 18 ? SKY_DAY : SKY_DUSK;
+}
+
 // suelo de cada bioma de dia (de noche se mezcla hacia el azul nocturno)
 static const uint16_t BIOME_SOIL[6] = {
   C565(0x7e, 0xc0, 0x7f),  // 0 pradera
@@ -1404,11 +1422,11 @@ uint8_t currentHoliday(bool *mainDay) {
 }
 
 void drawScene(uint8_t biome, uint32_t now, bool night) {
-  int h = sceneHour();
+  uint8_t ph = skyPhase();   // sun add-on
   uint16_t top, bot;
   if (night)            { top = C565(0x0c, 0x12, 0x24); bot = C565(0x1e, 0x26, 0x46); }
-  else if (h < 8)       { top = C565(0xd1, 0x6a, 0x86); bot = C565(0xf3, 0xb8, 0x7c); }  // amanecer
-  else if (h < 18)      { top = C565(0x8f, 0xc8, 0xea); bot = C565(0xdc, 0xee, 0xe6); }  // dia
+  else if (ph == SKY_DAWN) { top = C565(0xd1, 0x6a, 0x86); bot = C565(0xf3, 0xb8, 0x7c); }  // amanecer
+  else if (ph == SKY_DAY) { top = C565(0x8f, 0xc8, 0xea); bot = C565(0xdc, 0xee, 0xe6); }  // dia
   else                  { top = C565(0xc7, 0x5a, 0x4a); bot = C565(0xf0, 0xae, 0x64); }  // atardecer
 
   // weather add-on: grey skies outside turn the sky grey too, darker when it rains
@@ -1431,8 +1449,8 @@ void drawScene(uint8_t biome, uint32_t now, bool night) {
     gfx->fillCircle(360, 78, 24, C565(0xe8, 0xee, 0xf5));
     gfx->fillCircle(370, 72, 22, lerp565(top, bot, 78, HORIZON));  // creciente
     for (auto &st : STARS) gfx->fillRect(st[0], st[1], 4, 4, UI_WHITE);
-  } else if (h < 18) {
-    gfx->fillCircle(360, 84, 26, h < 8 ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
+  } else if (ph != SKY_DUSK) {
+    gfx->fillCircle(360, 84, 26, ph == SKY_DAWN ? C565(0xff, 0xd9, 0x8a) : C565(0xff, 0xe7, 0x9f));
     drawClouds(now, C565(0xff, 0xff, 0xff));
   } else {
     gfx->fillCircle(CX, HORIZON - 6, 34, C565(0xff, 0xf1, 0xc8));  // sol poniente
@@ -1731,8 +1749,7 @@ bool render() {
     renderCard();
     return true;
   }
-  int h = sceneHour();
-  gNight = pet.sleeping || h < 6 || h >= 20;
+  gNight = pet.sleeping || skyPhase() == SKY_NIGHT;   // sun add-on: real sunset
   // drawScene cubre la pantalla completa (LCD_WIDTH x LCD_HEIGHT): sin fillScreen(NEGRO) previo para
   // que un flush DMA solapado nunca capture negro a medias (anti-parpadeo)
   drawScene(pet.isEgg() ? 0 : DEX_TBL[pet.speciesId].biome, millis(), gNight);
@@ -2130,7 +2147,7 @@ static void memPicture(int16_t dex, int cx, int cy) {
 
 void renderMemory() {
   uint32_t now = millis();
-  bool night = sceneHour() < 6 || sceneHour() >= 20;
+  bool night = skyPhase() == SKY_NIGHT;
   uint16_t ink = night ? UI_INK_NIGHT : UI_INK;
   drawGameScene();
 
@@ -2197,7 +2214,7 @@ void renderMemory() {
 void renderSack() {
   uint32_t now = millis();
   drawGameScene();  // fondo del habitat
-  bool night = sceneHour() < 6 || sceneHour() >= 20;
+  bool night = skyPhase() == SKY_NIGHT;
   uint16_t ink = night ? UI_INK_NIGHT : UI_INK;
 
   // pantalla de resultado
@@ -2305,12 +2322,12 @@ void renderSack() {
 
 // fondo del minijuego: hatibat del bicho (cielo por hora + suelo del bioma)
 void drawGameScene() {
-  int hh = sceneHour();
-  bool night = hh < 6 || hh >= 20;
+  uint8_t ph = skyPhase();   // sun add-on
+  bool night = ph == SKY_NIGHT;
   uint16_t top, bot;
   if (night)       { top = C565(0x0c, 0x12, 0x24); bot = C565(0x1e, 0x26, 0x46); }
-  else if (hh < 8) { top = C565(0xd1, 0x6a, 0x86); bot = C565(0xf3, 0xb8, 0x7c); }
-  else if (hh < 18){ top = C565(0x8f, 0xc8, 0xea); bot = C565(0xdc, 0xee, 0xe6); }
+  else if (ph == SKY_DAWN) { top = C565(0xd1, 0x6a, 0x86); bot = C565(0xf3, 0xb8, 0x7c); }
+  else if (ph == SKY_DAY)  { top = C565(0x8f, 0xc8, 0xea); bot = C565(0xdc, 0xee, 0xe6); }
   else             { top = C565(0xc7, 0x5a, 0x4a); bot = C565(0xf0, 0xae, 0x64); }
   int hor = 376;
   for (int y = 0; y < hor; y += 8)
@@ -2327,7 +2344,7 @@ void renderGame() {
   // sin fillScreen(NEGRO): drawGameScene cubre la pantalla completa (LCD_WIDTH x LCD_HEIGHT). Si el
   // DMA del flush anterior aun lee el buffer, vera contenido valido (no negro
   // a medio pintar), que era el parpadeo a 25 fps.
-  bool night = sceneHour() < 6 || sceneHour() >= 20;
+  bool night = skyPhase() == SKY_NIGHT;
   uint16_t ink = night ? UI_INK_NIGHT : UI_INK;
 
   if (gameOverUntil) {

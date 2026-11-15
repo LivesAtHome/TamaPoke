@@ -25,6 +25,8 @@ struct WeatherNow {
   int16_t rawCode = -1;
   uint16_t precip10 = 0;      // precipitation in the last 15 min, tenths of a mm
   uint8_t cloud = 255;        // cloud cover %, 255 = not in the reply
+  int16_t sunriseMin = -1;    // sun add-on: today's sunrise/sunset, minutes after local midnight (-1 = unknown)
+  int16_t sunsetMin = -1;
 };
 // Phase 29: models flag drizzle and showers with nothing actually falling,
 // especially over mountain and tropical cities, which kept the sky raining

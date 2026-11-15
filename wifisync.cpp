@@ -99,7 +99,7 @@ static void syncTask(void *) {
       // New York rides along in the same request, for its snow
       snprintf(url, sizeof(url),
                "https://api.open-meteo.com/v1/forecast?latitude=%.2f," NY_LAT "&longitude=%.2f," NY_LON
-               "&current=temperature_2m,weather_code,precipitation,cloud_cover&timezone=auto", gLat, gLon);
+               "&current=temperature_2m,weather_code,precipitation,cloud_cover&daily=sunrise,sunset&forecast_days=1&timezone=auto", gLat, gLon);
       WiFiClientSecure tls;
       tls.setInsecure();        // weather is public data; there is no secret to protect here
       HTTPClient http;
