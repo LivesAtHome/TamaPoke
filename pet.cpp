@@ -491,6 +491,19 @@ void Pet::playResult(uint8_t score) {
   save();
 }
 
+// memory add-on: finding pairs is calmer than chasing a ball -- joy and bond,
+// a light energy cost, no stat training and no weight burned
+void Pet::memoryResult(uint8_t pairs) {
+  if (ceremony != CER_NONE || isEgg()) return;
+  joy = clamp100(joy + 5 + (pairs > 10 ? 30 : pairs * 3));
+  energy = dropTo(energy, 6, 5);
+  fullness = dropTo(fullness, 3, 5);
+  if (pairs >= 4) heartUntil = millis() + HEART_MS;
+  addBond(2);
+  registerCare();
+  save();
+}
+
 // saco de entrenamiento: los golpes entrenan la fuerza. Devuelve la subida.
 uint8_t Pet::trainStrength(uint16_t hits) {
   if (ceremony != CER_NONE || isEgg()) return 0;

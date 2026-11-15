@@ -144,6 +144,10 @@ uint32_t feedMenuUntil = 0;   // selector de comida abierto hasta este millis
 
 // minijuego "toques": mantener la pokeball en el aire
 bool gameOpen = false;
+bool memOpen = false;            // memory add-on: the pairs game
+uint32_t playMenuUntil = 0;      // memory add-on: the Ball / Memory picker
+#define PLAYMENU_X (167 + UI_DX)
+#define PLAYMENU_Y 288
 uint32_t gameOverUntil = 0;
 float ballX, ballY, ballVX, ballVY, gamePetX;
 uint32_t lastGameStep = 0;  // ultima llamada a stepGame(): fisica por tiempo real, no por frame
@@ -651,7 +655,7 @@ PowerCtx powerCtx(uint32_t now) {
   c.screenOff = c.screenOff || screenLock.blank(now);
 #endif
   c.sleeping = pet.sleeping;
-  c.gameOpen = gameOpen || sackOpen;
+  c.gameOpen = gameOpen || sackOpen || memOpen;
   c.usb = usbPresent();
   c.charging = batCharging();
   c.batPct = batPercent();
@@ -1088,15 +1092,15 @@ void openClock();  // prototipo
 
 void onSwipeV(int dir) {
   if (pet.awaitingStarter()) return;  // bloqueado durante la eleccion de inicial
-  if (gameOpen || galleryOpen || kbOpen || sackOpen || pet.ceremony) return;
+  if (gameOpen || memOpen || galleryOpen || kbOpen || sackOpen || pet.ceremony) return;
   if (clockOpen) { clockOpen = false; return; }
   if (cardOpen) {
     if (dir < 0) cardOpen = false;  // arriba cierra la ficha
     return;
   }
   if (dir > 0) {                    // deslizar abajo: ajustar hora
-    if (!confirmUntil && !feedMenuUntil) openClock();
-  } else if (!pet.isEgg() && !confirmUntil && !feedMenuUntil) {
+    if (!confirmUntil && !feedMenuUntil && !playMenuUntil) openClock();
+  } else if (!pet.isEgg() && !confirmUntil && !feedMenuUntil && !playMenuUntil) {
     cardOpen = true;                // deslizar arriba: ficha
     cardPage = 0;
   }
@@ -1105,7 +1109,7 @@ void onSwipeV(int dir) {
 // deslizar: dir +1 = hacia la derecha
 void onSwipe(int dir) {
   if (pet.awaitingStarter()) return;  // bloqueado durante la eleccion de inicial
-  if (gameOpen || kbOpen || clockOpen) return;
+  if (gameOpen || memOpen || kbOpen || clockOpen) return;
   if (cardOpen) {  // dentro de la ficha: cambiar entre las 4 paginas
     int p = (int)cardPage + (dir > 0 ? -1 : 1);  // izquierda avanza
     cardPage = p < 0 ? 0 : (p > 3 ? 3 : p);
@@ -1179,6 +1183,10 @@ void onTap(int16_t x, int16_t y) {
     gameTap(x, y);
     return;
   }
+  if (memOpen) {             // memory add-on
+    memTap(x, y);
+    return;
+  }
   if (choiceKind) {          // dialogo de decision: boton accion (arriba) / mantener (abajo)
     bool b1 = (x >= 93 + UI_DX && x <= 373 + UI_DX && y >= 206 && y <= 258);  // accion
     bool b2 = (x >= 93 + UI_DX && x <= 373 + UI_DX && y >= 268 && y <= 320);  // mantener / quedaros
@@ -1197,6 +1205,15 @@ void onTap(int16_t x, int16_t y) {
       pet.release();
     }
     confirmUntil = 0;
+    return;
+  }
+  if (playMenuUntil) {       // memory add-on: Ball / Memory picker
+    if (timeLeft(playMenuUntil) && y >= PLAYMENU_Y && y <= PLAYMENU_Y + 64 && x >= PLAYMENU_X && x < PLAYMENU_X + 2 * 66) {
+      sfxPlay(SFX_TAP);
+      if ((x - PLAYMENU_X) / 66 == 0) startGame();
+      else startMemory();
+    }
+    playMenuUntil = 0;
     return;
   }
   if (feedMenuUntil) {       // selector de comida
@@ -1234,7 +1251,8 @@ void onTap(int16_t x, int16_t y) {
       if (i == 0) {
         if (!pet.sleeping) feedMenuUntil = millis() + 6000;
       } else if (i == 1) {
-        startGame();
+        // memory add-on: the play button now offers a choice of game
+        if (!pet.isEgg() && !pet.sleeping && !pet.ceremony) playMenuUntil = millis() + 6000;
       } else if (i == 2) {
         pet.toggleLight();
       } else {
@@ -1630,7 +1648,7 @@ void printT(const char *s) {
 // mientras su "clave" no cambie no se repintan ni se vuelcan por QSPI.
 static bool staticScreen() {
   if (pet.awaitingStarter()) return true;
-  if (galleryOpen || gameOpen || sackOpen) return false;  // la galeria gestiona su propio repintado
+  if (galleryOpen || gameOpen || sackOpen || memOpen) return false;  // la galeria gestiona su propio repintado
   if (kbOpen || clockOpen) return true;
   return cardOpen && cardPage != 0;  // la pagina 0 tiene el retrato animado
 }
@@ -1691,6 +1709,10 @@ bool render() {
   }
   if (gameOpen) {
     renderGame();
+    return true;
+  }
+  if (memOpen) {
+    renderMemory();
     return true;
   }
   if (sackOpen) {
@@ -1787,6 +1809,39 @@ bool render() {
       drawMap(SPR_ICON_BERRY_B, 16, 176 + UI_DX, 296, 3, false);
       drawMap(SPR_ICON_BERRY_G, 16, 242 + UI_DX, 296, 3, false);
       drawMap(SPR_ICON_CANDY, 16, 308 + UI_DX, 296, 3, false);
+    }
+  }
+
+  // memory add-on: the Ball / Memory picker, drawn like the food picker
+  if (playMenuUntil) {
+    if (!timeLeft(playMenuUntil)) {
+      playMenuUntil = 0;
+    } else {
+      gfx->fillRoundRect(PLAYMENU_X - 8, PLAYMENU_Y, 2 * 66 + 16, 64, 14, UI_WHITE);
+      gfx->drawRoundRect(PLAYMENU_X - 8, PLAYMENU_Y, 2 * 66 + 16, 64, 14, inkColor());
+      // ball: a little pokeball
+      int bx = PLAYMENU_X + 33, by = PLAYMENU_Y + 32;
+      gfx->fillCircle(bx, by, 22, UI_WHITE);
+      gfx->fillRect(bx - 22, by - 22, 45, 22, UI_BAR_BAD);
+      gfx->fillCircle(bx, by, 22, UI_WHITE);
+      for (int r = -22; r < 0; r++) {                    // top half red
+        int w = (int)sqrtf((float)(22 * 22 - r * r));
+        gfx->drawFastHLine(bx - w, by + r, 2 * w + 1, UI_BAR_BAD);
+      }
+      gfx->drawCircle(bx, by, 22, UI_INK);
+      gfx->drawFastHLine(bx - 22, by, 45, UI_INK);
+      gfx->fillCircle(bx, by, 6, UI_WHITE);
+      gfx->drawCircle(bx, by, 6, UI_INK);
+      // memory: two cards, one face down and one face up
+      int mx = PLAYMENU_X + 66 + 14, my = PLAYMENU_Y + 10;
+      gfx->fillRoundRect(mx, my + 4, 26, 36, 5, C565(0x4f, 0x93, 0xc4));
+      gfx->drawRoundRect(mx, my + 4, 26, 36, 5, UI_INK);
+      gfx->fillRoundRect(mx + 14, my, 26, 36, 5, UI_WHITE);
+      gfx->drawRoundRect(mx + 14, my, 26, 36, 5, UI_INK);
+      gfx->setTextColor(UI_INK);
+      setSize(2);
+      setCur(mx + 22, my + 10);
+      printT("?");
     }
   }
 
@@ -1949,6 +2004,170 @@ void sackTap() {
 }
 
 void drawGameScene();  // prototipo (definida mas abajo)
+
+// ---------- memory add-on: find the pairs (idea from botero50/TamaPoke's Fun Pack) ----------
+// 12 face-down cards hide 6 pairs of Pokemon. Turn two at a time; a match stays
+// up. 60 seconds; clearing the board deals a fresh one for a bonus. Tap the
+// top edge to quit without a reward, like the ball game.
+
+#define MEM_COLS 4
+#define MEM_ROWS 3
+#define MEM_CARDS (MEM_COLS * MEM_ROWS)
+#define MEM_W 70
+#define MEM_H 60
+#define MEM_X(c) (CX - 2 * 76 + (c) * 76 + 3)
+#define MEM_Y(r) (130 + (r) * 68)
+#define MEM_GAME_MS 60000UL
+#define MEM_OVER_MS 3000UL
+int16_t memDex[MEM_CARDS];
+uint8_t memState[MEM_CARDS];      // 0 face down, 1 face up (being looked at), 2 matched
+int8_t memFirst = -1, memSecond = -1;
+uint32_t memHideAt = 0, memEndAt = 0, memOverUntil = 0;
+uint8_t memPairs = 0;
+
+static bool memReached(uint32_t now, uint32_t at) { return (int32_t)(now - at) >= 0; }
+
+static void memDeal() {
+  int16_t picks[MEM_CARDS / 2];
+  for (int i = 0; i < MEM_CARDS / 2; i++) {
+    int16_t d = 0;
+    for (int t = 0; t < 60 && !d; t++) {         // a Pokemon whose picture is on the card, not used yet
+      int16_t c = (int16_t)(1 + random(151));
+      if (!thumbs.get(c)) continue;
+      bool dup = false;
+      for (int j = 0; j < i; j++) if (picks[j] == c) dup = true;
+      if (!dup) d = c;
+    }
+    picks[i] = d ? d : (int16_t)(1 + i * 3);        // no SD pictures: still a playable board
+  }
+  for (int i = 0; i < MEM_CARDS; i++) { memDex[i] = picks[i / 2]; memState[i] = 0; }
+  for (int i = MEM_CARDS - 1; i > 0; i--) { int j = random(i + 1); int16_t t = memDex[i]; memDex[i] = memDex[j]; memDex[j] = t; }
+  memFirst = memSecond = -1;
+  memHideAt = 0;
+}
+
+void startMemory() {
+  if (pet.isEgg() || pet.sleeping || pet.ceremony) return;
+  memDeal();
+  memPairs = 0;
+  memOverUntil = 0;
+  memEndAt = millis() + MEM_GAME_MS;
+  memOpen = true;
+}
+
+static void memFinish() {
+  memOverUntil = millis() + MEM_OVER_MS;
+  pet.memoryResult(memPairs);
+  sfxPlay(memPairs >= 4 ? SFX_HEART : SFX_TAP);
+}
+
+void memTap(int16_t x, int16_t y) {
+  if (memOverUntil) return;
+  if (y < GAME_EXIT_Y) { memOpen = false; return; }      // quit early: no reward
+  if (memSecond >= 0) return;                             // two are up: wait for them to turn back
+  for (int i = 0; i < MEM_CARDS; i++) {
+    int cx = MEM_X(i % MEM_COLS), cy = MEM_Y(i / MEM_COLS);
+    if (x < cx || x > cx + MEM_W || y < cy || y > cy + MEM_H || memState[i]) continue;
+    memState[i] = 1;
+    sfxPlay(SFX_TAP);
+    if (memFirst < 0) { memFirst = (int8_t)i; return; }
+    memSecond = (int8_t)i;
+    if (memDex[memFirst] == memDex[memSecond]) {          // a pair
+      memState[memFirst] = memState[memSecond] = 2;
+      memFirst = memSecond = -1;
+      memPairs++;
+      sfxPlay(SFX_PLAY);
+      bool all = true;
+      for (int k = 0; k < MEM_CARDS; k++) if (memState[k] != 2) all = false;
+      if (all) { memPairs += 2; memDeal(); }              // the whole board: 2 bonus pairs and a new deal
+    } else memHideAt = millis() + 800;
+    return;
+  }
+}
+
+// a card's picture, scaled to fit, centred on (cx, cy)
+static void memPicture(int16_t dex, int cx, int cy) {
+  const uint8_t *th = thumbs.get(dex);
+  if (!th) {                                              // no picture: its number instead
+    char n[6];
+    snprintf(n, sizeof(n), "%d", dex);
+    gfx->setTextColor(UI_INK);
+    setSize(2);
+    setCur(cx - (int)strlen(n) * 6, cy - 8);
+    printT(n);
+    return;
+  }
+  int w = th[0], h = th[1];
+  int s = 1;
+  if (w * 2 <= MEM_W - 6 && h * 2 <= MEM_H - 6) s = 2;
+  drawThumb(th, cx - 40, cy - 40, s, false);   // drawThumb centres in an 80 px cell (GAL_CELL)
+}
+
+void renderMemory() {
+  uint32_t now = millis();
+  bool night = sceneHour() < 6 || sceneHour() >= 20;
+  uint16_t ink = night ? UI_INK_NIGHT : UI_INK;
+  drawGameScene();
+
+  if (memOverUntil) {                                     // the result
+    if (!timeLeft(memOverUntil)) { memOpen = false; return; }
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%u pairs!", memPairs);
+    gfx->setTextColor(ink);
+    setSize(4);
+    setCur(centerX(buf, 4), 170);
+    printT(buf);
+    const char *msg = memPairs >= 6 ? T(S_GREAT_JOY) : T(S_PLUS_JOY);
+    setSize(2);
+    setCur(centerX(msg, 2), 230);
+    printT(msg);
+    flushUI();
+    return;
+  }
+
+  if (memReached(now, memEndAt)) { memFinish(); return; }
+  if (memSecond >= 0 && memHideAt && memReached(now, memHideAt)) {
+    memState[memFirst] = memState[memSecond] = 0;
+    memFirst = memSecond = -1;
+    memHideAt = 0;
+  }
+
+  char buf[24];                                           // pairs so far
+  snprintf(buf, sizeof(buf), "Pairs: %u", memPairs);
+  gfx->setTextColor(ink);
+  setSize(3);
+  setCur(centerX(buf, 3), 66);
+  printT(buf);
+
+  for (int i = 0; i < MEM_CARDS; i++) {
+    int cx = MEM_X(i % MEM_COLS), cy = MEM_Y(i / MEM_COLS);
+    if (memState[i]) {
+      uint16_t face = memState[i] == 2 ? lerp565(UI_BAR_OK, UI_WHITE, 5, 8) : UI_WHITE;
+      gfx->fillRoundRect(cx, cy, MEM_W, MEM_H, 10, face);
+      gfx->drawRoundRect(cx, cy, MEM_W, MEM_H, 10, UI_INK);
+      memPicture(memDex[i], cx + MEM_W / 2, cy + MEM_H / 2);
+    } else {                                              // a card back: a little pokeball
+      int bx = cx + MEM_W / 2, by = cy + MEM_H / 2;
+      gfx->fillRoundRect(cx, cy, MEM_W, MEM_H, 10, C565(0x4f, 0x93, 0xc4));
+      gfx->drawRoundRect(cx, cy, MEM_W, MEM_H, 10, UI_INK);
+      gfx->fillCircle(bx, by, 13, UI_WHITE);
+      for (int r = -13; r < 0; r++) {
+        int w = (int)sqrtf((float)(13 * 13 - r * r));
+        gfx->drawFastHLine(bx - w, by + r, 2 * w + 1, UI_BAR_BAD);
+      }
+      gfx->drawCircle(bx, by, 13, UI_INK);
+      gfx->drawFastHLine(bx - 13, by, 27, UI_INK);
+    }
+  }
+
+  // time left: a bar under the cards
+  uint32_t left = memReached(now, memEndAt) ? 0 : memEndAt - now;
+  int bw = 240, bx = CX - bw / 2, by = 344;
+  gfx->fillRoundRect(bx, by, bw, 12, 6, UI_TRACK);
+  int fw = (int)((uint64_t)bw * left / MEM_GAME_MS);
+  if (fw > 0) gfx->fillRoundRect(bx, by, fw, 12, 6, left < 10000 ? UI_BAR_BAD : UI_BAR_OK);
+  flushUI();
+}
 
 void renderSack() {
   uint32_t now = millis();
