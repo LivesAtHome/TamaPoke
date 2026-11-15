@@ -14,6 +14,9 @@ same one as `tools/send_sd.py`).
   is never written. `new_install_prompt_erase` must stay **true**: ESP Web Tools erases the whole
   chip by default on boards without Improv Serial when it is false. With it true, the user is asked
   and the box starts unticked, so updates keep the pet and the Wi-Fi settings.
+- **Releasing:** name the app `firmware/tamapoke-app-<version>.bin` (a new name every release) and
+  point `manifest.json` at it. The page asks for the manifest with a fresh query, so neither the
+  browser nor the Pages CDN can hand out an old manifest or an old firmware under a new label.
 - `firmware/` — those four parts, from an `arduino-cli compile --output-dir` build
   (`boot_app0.bin` comes from the ESP32 core's `tools/partitions/`).
 - `sprites.pak` — all the sprites in one bundle (TPAK), so the page sends them in

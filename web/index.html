@@ -55,7 +55,7 @@
   <h2><span class="num">1</span>Install or update the firmware</h2>
   <div class="step">
     <p>Plug the board in via USB, press the button and pick the port. It takes about a minute.</p>
-    <esp-web-install-button manifest="manifest.json">
+    <esp-web-install-button id="installer" manifest="manifest.json">
       <button slot="activate">⚡ Install / update</button>
       <span slot="unsupported">Browser not supported (use Chrome/Edge).</span>
       <span slot="not-allowed">Needs HTTPS.</span>
@@ -164,6 +164,11 @@
         integrity="sha384-9XfyvAabgkISlB/Xb3OpshGKpZx0TOt5Mmu78SeiNU3so/p4o2s9m66vy6Utdnom"
         src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js"></script>
 <script>
+// GitHub Pages lets browsers and its own servers reuse files for 10 minutes. Ask for
+// the manifest with a fresh query every visit so a new release shows up at once; the
+// firmware file itself gets a new name each release, so it can never be a stale copy.
+document.getElementById('installer').setAttribute('manifest', 'manifest.json?t=' + Date.now());
+
 const mkLog = (id) => (m) => { const el = document.getElementById(id); el.style.display = 'block';
   el.textContent += m + '\n'; el.scrollTop = el.scrollHeight; };
 const log = mkLog('log'), wlog = mkLog('wifilog'), hlog = mkLog('hlog');
