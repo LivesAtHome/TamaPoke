@@ -1822,8 +1822,6 @@ bool render() {
       // ball: a little pokeball
       int bx = PLAYMENU_X + 33, by = PLAYMENU_Y + 32;
       gfx->fillCircle(bx, by, 22, UI_WHITE);
-      gfx->fillRect(bx - 22, by - 22, 45, 22, UI_BAR_BAD);
-      gfx->fillCircle(bx, by, 22, UI_WHITE);
       for (int r = -22; r < 0; r++) {                    // top half red
         int w = (int)sqrtf((float)(22 * 22 - r * r));
         gfx->drawFastHLine(bx - w, by + r, 2 * w + 1, UI_BAR_BAD);

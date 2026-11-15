@@ -1,6 +1,6 @@
 {
   "name": "TamaPoke + Weather",
-  "version": "1.20-wx4",
+  "version": "1.20-wx5",
   "new_install_prompt_erase": true,
   "builds": [
     {
