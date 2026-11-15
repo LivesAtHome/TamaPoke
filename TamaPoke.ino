@@ -2011,10 +2011,10 @@ void drawGameScene();  // prototipo (definida mas abajo)
 #define MEM_COLS 4
 #define MEM_ROWS 3
 #define MEM_CARDS (MEM_COLS * MEM_ROWS)
-#define MEM_W 70
-#define MEM_H 60
-#define MEM_X(c) (CX - 2 * 76 + (c) * 76 + 3)
-#define MEM_Y(r) (130 + (r) * 68)
+#define MEM_W 74
+#define MEM_H 66
+#define MEM_X(c) (CX - 2 * 78 + (c) * 78 + 2)
+#define MEM_Y(r) (118 + (r) * 70)
 #define MEM_GAME_MS 60000UL
 #define MEM_OVER_MS 3000UL
 int16_t memDex[MEM_CARDS];
@@ -2083,7 +2083,8 @@ void memTap(int16_t x, int16_t y) {
   }
 }
 
-// a card's picture, scaled to fit, centred on (cx, cy)
+// a card's picture: the thumbnail cropped to the Pokemon itself (the 40x40 cell
+// has empty margins) and scaled up to fill the card, centred on (cx, cy)
 static void memPicture(int16_t dex, int cx, int cy) {
   const uint8_t *th = thumbs.get(dex);
   if (!th) {                                              // no picture: its number instead
@@ -2095,10 +2096,36 @@ static void memPicture(int16_t dex, int cx, int cy) {
     printT(n);
     return;
   }
-  int w = th[0], h = th[1];
-  int s = 1;
-  if (w * 2 <= MEM_W - 6 && h * 2 <= MEM_H - 6) s = 2;
-  drawThumb(th, cx - 40, cy - 40, s, false);   // drawThumb centres in an 80 px cell (GAL_CELL)
+  int w = th[0], h = th[1], n = th[2];
+  const uint8_t *pal = th + 3, *d = pal + n * 2;
+  int x0 = w, y0 = h, x1 = -1, y1 = -1;                   // bounding box of the opaque pixels
+  for (int r = 0; r < h; r++)
+    for (int c = 0; c < w; c++)
+      if (d[r * w + c] != 0xFF) {
+        if (c < x0) x0 = c;
+        if (c > x1) x1 = c;
+        if (r < y0) y0 = r;
+        if (r > y1) y1 = r;
+      }
+  if (x1 < 0) return;
+  int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  const int maxW = MEM_W - 10, maxH = MEM_H - 8;
+  // scale in 1/16ths, as large as fits; never below 1x
+  int sc = (maxW * 16) / bw;
+  if ((maxH * 16) / bh < sc) sc = (maxH * 16) / bh;
+  if (sc < 16) sc = 16;
+  int ow = bw * sc / 16, oh = bh * sc / 16;
+  int ox = cx - ow / 2, oy = cy - oh / 2;
+  for (int r = 0; r < bh; r++) {
+    const uint8_t *row = d + (y0 + r) * w + x0;
+    int ya = oy + r * sc / 16, yb = oy + (r + 1) * sc / 16;
+    if (yb <= ya) continue;
+    forRuns(bw, [&](int c) { return indexedKey(row[c], false); },
+            [&](int c0, int len, int k) {
+              int xa = ox + c0 * sc / 16, xb = ox + (c0 + len) * sc / 16;
+              gfx->fillRect(xa, ya, xb - xa, yb - ya, (uint16_t)(pal[k * 2] | (pal[k * 2 + 1] << 8)));
+            });
+  }
 }
 
 void renderMemory() {
@@ -2134,7 +2161,7 @@ void renderMemory() {
   snprintf(buf, sizeof(buf), "Pairs: %u", memPairs);
   gfx->setTextColor(ink);
   setSize(3);
-  setCur(centerX(buf, 3), 66);
+  setCur(centerX(buf, 3), 64);
   printT(buf);
 
   for (int i = 0; i < MEM_CARDS; i++) {
@@ -2148,19 +2175,19 @@ void renderMemory() {
       int bx = cx + MEM_W / 2, by = cy + MEM_H / 2;
       gfx->fillRoundRect(cx, cy, MEM_W, MEM_H, 10, C565(0x4f, 0x93, 0xc4));
       gfx->drawRoundRect(cx, cy, MEM_W, MEM_H, 10, UI_INK);
-      gfx->fillCircle(bx, by, 13, UI_WHITE);
-      for (int r = -13; r < 0; r++) {
-        int w = (int)sqrtf((float)(13 * 13 - r * r));
+      gfx->fillCircle(bx, by, 16, UI_WHITE);
+      for (int r = -16; r < 0; r++) {
+        int w = (int)sqrtf((float)(16 * 16 - r * r));
         gfx->drawFastHLine(bx - w, by + r, 2 * w + 1, UI_BAR_BAD);
       }
-      gfx->drawCircle(bx, by, 13, UI_INK);
-      gfx->drawFastHLine(bx - 13, by, 27, UI_INK);
+      gfx->drawCircle(bx, by, 16, UI_INK);
+      gfx->drawFastHLine(bx - 16, by, 33, UI_INK);
     }
   }
 
   // time left: a bar under the cards
   uint32_t left = memReached(now, memEndAt) ? 0 : memEndAt - now;
-  int bw = 240, bx = CX - bw / 2, by = 344;
+  int bw = 240, bx = CX - bw / 2, by = 342;
   gfx->fillRoundRect(bx, by, bw, 12, 6, UI_TRACK);
   int fw = (int)((uint64_t)bw * left / MEM_GAME_MS);
   if (fw > 0) gfx->fillRoundRect(bx, by, fw, 12, 6, left < 10000 ? UI_BAR_BAD : UI_BAR_OK);
