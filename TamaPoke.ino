@@ -3768,25 +3768,33 @@ static void drawArcBar(float a0, float a1, uint8_t val, uint16_t col, const char
   uint16_t fill = val >= 25 ? col : UI_BAR_BAD;
   int m = n * val / 100;
   for (int k = 0; k <= m; k++) arcDot(a0 + step * k, ARC_R, ARC_TH / 2 - 2, fill);
-  // the label, just inside the arc, with a soft shadow so it reads over sky or grass
-  setSize(2);
+  // the label: big and bold, tucked 8 px inside the arc's inner edge (measured at
+  // whichever of its top/bottom rows is tighter), with a shadow for sky or grass
+  setSize(3);
+  const int h = 24, w = textW(label, 3);
   float a = labelDeg * 0.0174533f;
-  int lr = ARC_R - 34;
-  int lx = CX + (int)(lr * cosf(a)), ly = LCD_HEIGHT / 2 - (int)(lr * sinf(a)) - 8;
-  if (!left) lx -= textW(label, 2);
+  int r = ARC_R - ARC_TH / 2;
+  int yc = LCD_HEIGHT / 2 - (int)(r * sinf(a));
+  int dyTop = yc - h / 2 - LCD_HEIGHT / 2, dyBot = yc + h / 2 - LCD_HEIGHT / 2;
+  int in1 = (int)sqrtf((float)(r * r - dyTop * dyTop)), in2 = (int)sqrtf((float)(r * r - dyBot * dyBot));
+  int inner = in1 < in2 ? in1 : in2;
+  int lx = left ? CX - inner + 8 : CX + inner - 8 - w;
+  int ly = yc - h / 2;
   gfx->setTextColor(gNight ? C565(0x10, 0x14, 0x24) : UI_WHITE);
-  setCur(lx + 1, ly + 1);
+  setCur(lx + 2, ly + 2);
   printT(label);
   gfx->setTextColor(inkColor());
   setCur(lx, ly);
   printT(label);
+  setCur(lx + 1, ly);          // a second pass one pixel over: bolder strokes
+  printT(label);
 }
 
 void drawBars() {
-  drawArcBar(178, 148, pet.joy,      C565(0xf0, 0x6e, 0xa0), T(S_BAR_JOY),  168, true);
-  drawArcBar(212, 184, pet.fullness, C565(0xf5, 0xb4, 0x46), T(S_BAR_FOOD), 210, true);
-  drawArcBar(2, 32,    pet.energy,   C565(0x50, 0xd2, 0xbe), T(S_BAR_ENE),  12,  false);
-  drawArcBar(-32, -4,  pet.hygiene,  C565(0x5a, 0xa0, 0xf0), T(S_BAR_HYG),  -30, false);
+  drawArcBar(178, 148, pet.joy,      C565(0xf0, 0x6e, 0xa0), T(S_BAR_JOY),  171, true);
+  drawArcBar(212, 184, pet.fullness, C565(0xf5, 0xb4, 0x46), T(S_BAR_FOOD), 206, true);
+  drawArcBar(2, 32,    pet.energy,   C565(0x50, 0xd2, 0xbe), T(S_BAR_ENE),  9,   false);
+  drawArcBar(-32, -4,  pet.hygiene,  C565(0x5a, 0xa0, 0xf0), T(S_BAR_HYG),  -26, false);
 }
 
 // Separacion entre la etiqueta y su barra en la fila de necesidades. Estaba fija
