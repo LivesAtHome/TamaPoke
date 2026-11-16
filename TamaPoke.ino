@@ -156,6 +156,8 @@ uint32_t playMenuUntil = 0;      // memory add-on: the Ball / Memory picker
 #define PLAYMENU_X (167 + UI_DX)
 #define PLAYMENU_Y 288
 #define PANEL_TOP 356   // arc-bars add-on: top of the button panel (was 312 with the straight bars)
+#define BAT_Y_TOP 12      // battery icon: top (egg screen)
+#define BAT_Y_BOTTOM 440  // battery icon: under the buttons (pet screen)
 uint32_t gameOverUntil = 0;
 float ballX, ballY, ballVX, ballVY, gamePetX;
 uint32_t lastGameStep = 0;  // ultima llamada a stepGame(): fisica por tiempo real, no por frame
@@ -1889,6 +1891,7 @@ bool render() {
     gfx->fillRect(0, PANEL_TOP, LCD_WIDTH, LCD_HEIGHT - PANEL_TOP, gNight ? UI_BG_NIGHT : UI_BG_DAY);
     drawBars();
     drawButtons();
+    drawBattery(BAT_Y_BOTTOM);   // battery-at-bottom add-on
     drawCelebration();
     if (pet.wantEvolveButton()) drawEvolveButton();        // CTA rojo: evolucionar
     else if (pet.canRunawayNow()) drawRunawayButton();     // CTA sombrio: escapada (abandono)
@@ -3165,10 +3168,14 @@ void galleryTap(int16_t x, int16_t y) {
   galleryPmd.load(dex, pet.isShinyRegistered(dex));
 }
 
-void drawBattery() {
+// battery-at-bottom add-on: on the pet's main screen the icon sits under the
+// buttons, so the outside temperature at the top isn't read as a battery level
+static bool batteryAtBottom() { return !pet.isEgg(); }
+
+void drawBattery(int y) {
   int pc = batPercent();
   if (pc < 0) return;  // sin bateria conectada
-  int x = CX - 14, y = 12, w = 24, h = 11;
+  int x = CX - 14, w = 24, h = 11;
   bool charging = batCharging();
   uint16_t col = charging ? UI_BAR_OK
                  : (pc >= 40) ? inkColor()
@@ -3196,13 +3203,13 @@ void drawOutsideTemp() {
   snprintf(t, sizeof(t), "%dF", f);
   gfx->setTextColor(inkColor());
   setSize(2);
-  int x = batPercent() < 0 ? centerX(t, 2) : CX + 20;   // no battery: centred where the battery would be
+  int x = (batPercent() < 0 || batteryAtBottom()) ? centerX(t, 2) : CX + 20;   // alone at the top: centred
   setCur(x, 10);
   printT(t);
 }
 
 void drawHeader(const char *name, uint16_t nameColor, const char *msg) {
-  drawBattery();
+  if (!batteryAtBottom()) drawBattery(BAT_Y_TOP);
   drawOutsideTemp();
   gfx->setTextColor(nameColor);
   setSize(3);
