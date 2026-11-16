@@ -3770,8 +3770,8 @@ static void drawArcBar(float a0, float a1, uint8_t val, uint16_t col, const char
   for (int k = 0; k <= m; k++) arcDot(a0 + step * k, ARC_R, ARC_TH / 2 - 2, fill);
   // the label: big and bold, tucked 8 px inside the arc's inner edge (measured at
   // whichever of its top/bottom rows is tighter), with a shadow for sky or grass
-  setSize(3);
-  const int h = 24, w = textW(label, 3);
+  setSize(2);
+  const int h = 16, w = textW(label, 2) + 1;   // +1: the bold pass
   float a = labelDeg * 0.0174533f;
   int r = ARC_R - ARC_TH / 2;
   int yc = LCD_HEIGHT / 2 - (int)(r * sinf(a));
@@ -3781,7 +3781,9 @@ static void drawArcBar(float a0, float a1, uint8_t val, uint16_t col, const char
   int lx = left ? CX - inner + 8 : CX + inner - 8 - w;
   int ly = yc - h / 2;
   gfx->setTextColor(gNight ? C565(0x10, 0x14, 0x24) : UI_WHITE);
-  setCur(lx + 2, ly + 2);
+  setCur(lx + 1, ly + 1);
+  printT(label);
+  setCur(lx + 2, ly + 1);
   printT(label);
   gfx->setTextColor(inkColor());
   setCur(lx, ly);
