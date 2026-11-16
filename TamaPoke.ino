@@ -420,6 +420,13 @@ void setup() {
   // tactil; el cuelgue del tactil dormido se resuelve gateando por INT, ver
   // handleTouch).
   Wire.setTimeOut(50);
+  // touch-freeze fix: SensorLib reads with Stream::readBytes(), and when the touch
+  // chip is napping it returns short -- readBytes() then waits Stream's default
+  // timeout of 1000 ms for bytes that never come. That was the 1 s freeze per tap
+  // in the Memory game (and issue #16). requestFrom() is synchronous, so the bytes
+  // are either already there or not coming: 20 ms is plenty. (setTimeOut, capital
+  // O, above is the I2C bus timeout; setTimeout is the Stream one.)
+  Wire.setTimeout(20);
 
 #if HAS_PMU
   // CRITICO: encender la alimentacion del panel (BLDO1=OLED VDD 3.3V) ANTES de
