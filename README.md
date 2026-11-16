@@ -33,6 +33,8 @@
 - 🃏 **Memory game.** The ⚽ Play button now opens a picker: the original ball game, or Memory —
   find the pairs of Pokémon among 12 cards in 60 seconds (clear the board for a bonus and a new deal).
   A calmer game: joy and bond, a light energy cost, no stat training.
+- 🌈 **Curved stat gauges.** JOY, FOOD, ENE and HYG hug the round screen as colour arcs
+  (red under 25), leaving more room for the scene. Look inspired by JoopPrints' TamaDigi.
 - 🎉 **Holidays.** Decorations go up a week before New Year's, Valentine's, St. Patrick's, Easter,
   the 4th of July, Halloween, Thanksgiving and Christmas, with a greeting on the day itself.
 - 🛠️ **Installer page for this version** with Wi-Fi setup by ZIP code or town, a "did it work?"

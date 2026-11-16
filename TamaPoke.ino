@@ -155,6 +155,7 @@ uint32_t awayPendingSince = 0;
 uint32_t playMenuUntil = 0;      // memory add-on: the Ball / Memory picker
 #define PLAYMENU_X (167 + UI_DX)
 #define PLAYMENU_Y 288
+#define PANEL_TOP 356   // arc-bars add-on: top of the button panel (was 312 with the straight bars)
 uint32_t gameOverUntil = 0;
 float ballX, ballY, ballVX, ballVY, gamePetX;
 uint32_t lastGameStep = 0;  // ultima llamada a stepGame(): fisica por tiempo real, no por frame
@@ -1883,8 +1884,9 @@ bool render() {
     drawBath();
     drawPoops();
     drawSweep();  // broom add-on
-    // panel inferior: base limpia para barras y botones sobre el paisaje
-    gfx->fillRect(0, 312, LCD_WIDTH, LCD_HEIGHT - 312, gNight ? UI_BG_NIGHT : UI_BG_DAY);
+    // panel inferior: base limpia para los botones sobre el paisaje (arc-bars add-on:
+    // the bars moved to the screen edge, so the panel starts lower and the ground shows more)
+    gfx->fillRect(0, PANEL_TOP, LCD_WIDTH, LCD_HEIGHT - PANEL_TOP, gNight ? UI_BG_NIGHT : UI_BG_DAY);
     drawBars();
     drawButtons();
     drawCelebration();
@@ -3746,11 +3748,45 @@ void drawSweep() {
   }
 }
 
+// ---------- arc-bars add-on (look inspired by JoopPrints' TamaDigi) ----------
+// The four needs as curved gauges hugging the round screen: JOY and FOOD on the
+// left, ENE and HYG on the right. Each fills from its bottom end upward, in its
+// own colour, turning red under 25. Angles in degrees, 0 = right, 90 = top.
+#define ARC_R 219
+#define ARC_TH 12
+
+static void arcDot(float deg, int r, int rad, uint16_t col) {
+  float a = deg * 0.0174533f;
+  gfx->fillCircle(CX + (int)(r * cosf(a)), LCD_HEIGHT / 2 - (int)(r * sinf(a)), rad, col);
+}
+
+static void drawArcBar(float a0, float a1, uint8_t val, uint16_t col, const char *label, float labelDeg, bool left) {
+  float step = (a1 > a0) ? 1.0f : -1.0f;
+  int n = (int)fabsf(a1 - a0);
+  uint16_t track = gNight ? C565(0x3a, 0x3e, 0x4c) : C565(0xd8, 0xd2, 0xc2);
+  for (int k = 0; k <= n; k++) arcDot(a0 + step * k, ARC_R, ARC_TH / 2, track);
+  uint16_t fill = val >= 25 ? col : UI_BAR_BAD;
+  int m = n * val / 100;
+  for (int k = 0; k <= m; k++) arcDot(a0 + step * k, ARC_R, ARC_TH / 2 - 2, fill);
+  // the label, just inside the arc, with a soft shadow so it reads over sky or grass
+  setSize(2);
+  float a = labelDeg * 0.0174533f;
+  int lr = ARC_R - 34;
+  int lx = CX + (int)(lr * cosf(a)), ly = LCD_HEIGHT / 2 - (int)(lr * sinf(a)) - 8;
+  if (!left) lx -= textW(label, 2);
+  gfx->setTextColor(gNight ? C565(0x10, 0x14, 0x24) : UI_WHITE);
+  setCur(lx + 1, ly + 1);
+  printT(label);
+  gfx->setTextColor(inkColor());
+  setCur(lx, ly);
+  printT(label);
+}
+
 void drawBars() {
-  drawBar(78 + UI_DX, 318, T(S_BAR_FOOD), pet.fullness);
-  drawBar(244 + UI_DX, 318, T(S_BAR_JOY), pet.joy);
-  drawBar(78 + UI_DX, 346, T(S_BAR_ENE), pet.energy);
-  drawBar(244 + UI_DX, 346, T(S_BAR_HYG), pet.hygiene);
+  drawArcBar(178, 148, pet.joy,      C565(0xf0, 0x6e, 0xa0), T(S_BAR_JOY),  168, true);
+  drawArcBar(212, 184, pet.fullness, C565(0xf5, 0xb4, 0x46), T(S_BAR_FOOD), 210, true);
+  drawArcBar(2, 32,    pet.energy,   C565(0x50, 0xd2, 0xbe), T(S_BAR_ENE),  12,  false);
+  drawArcBar(-32, -4,  pet.hygiene,  C565(0x5a, 0xa0, 0xf0), T(S_BAR_HYG),  -30, false);
 }
 
 // Separacion entre la etiqueta y su barra en la fila de necesidades. Estaba fija
